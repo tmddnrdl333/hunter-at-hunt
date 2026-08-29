@@ -61,6 +61,22 @@ export function GuideButton() {
               Data refreshes daily around 7 AM ET from official NC State
               sources.
             </p>
+            <hr className="my-4 border-stone-200 dark:border-stone-700" />
+            <h3 className="text-sm font-bold">Who made this?</h3>
+            <p className="mt-1 text-sm leading-relaxed">
+              Hi, I&apos;m <b>Seungwook Jung</b> — from South Korea, studying
+              at NC State. Campus events were scattered across too many sites,
+              so I built one place to catch them all. Hope it helps you never
+              miss a good one (or a free slice). 🍕
+            </p>
+            <a
+              href="https://github.com/tmddnrdl333/hunter-at-hunt"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block text-sm font-medium text-red-800 underline underline-offset-2 hover:text-red-600 dark:text-red-300"
+            >
+              View the project on GitHub →
+            </a>
           </div>
         </div>
       )}
