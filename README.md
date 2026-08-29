@@ -43,3 +43,7 @@ npm run db:push    # 스키마를 DB에 반영 (drizzle-kit)
 ```
 
 `.env.local`에 `DATABASE_URL`(Supabase transaction pooler), `GEMINI_API_KEY` 필요.
+
+**데모 모드**: 둘 다 없어도 돌아간다 — `DATABASE_URL`이 없으면 로컬 파일 기반
+PGlite(내장 Postgres, `./data/pglite`)로 자동 전환되고, `GEMINI_API_KEY`가 없으면
+LLM 정제 대신 키워드 매칭으로 폴백한다. clone 후 `npm run db:push && npm run ingest`만으로 체험 가능.

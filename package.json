@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.3",
     "postgres": "^3.4.9",

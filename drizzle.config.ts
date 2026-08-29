@@ -11,9 +11,12 @@ try {
   /* .env.local 없으면 무시 */
 }
 
+// DATABASE_URL 없으면 로컬 데모 모드(PGlite) 대상으로 스키마를 만든다
 export default defineConfig({
   dialect: 'postgresql',
   schema: './src/lib/db/schema.ts',
   out: './drizzle',
-  dbCredentials: { url: process.env.DATABASE_URL! },
+  ...(process.env.DATABASE_URL
+    ? { dbCredentials: { url: process.env.DATABASE_URL } }
+    : { driver: 'pglite', dbCredentials: { url: './data/pglite' } }),
 });

@@ -4,7 +4,7 @@
  * 실제 로직은 src/lib/ingest.ts — Vercel Cron route와 공유.
  */
 import './load-env';
-import { dbClient } from '../src/lib/db';
+import { closeDb } from '../src/lib/db';
 import { runIngest } from '../src/lib/ingest';
 
 const days = Number(
@@ -14,10 +14,10 @@ const useLlm = !process.argv.includes('--no-llm');
 
 runIngest({ days, useLlm })
   .then(async () => {
-    await dbClient.end();
+    await closeDb();
   })
   .catch(async (err) => {
     console.error(err);
-    await dbClient.end().catch(() => {});
+    await closeDb().catch(() => {});
     process.exit(1);
   });
