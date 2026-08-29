@@ -1,0 +1,63 @@
+'use client';
+
+import { useState } from 'react';
+
+/** 헤더 우상단 가이드 버튼 + 서비스 소개 팝업 */
+export function GuideButton() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        aria-label="How to use"
+        className="absolute right-3 top-3 rounded-full bg-black/30 px-3 py-1 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-black/50"
+      >
+        ? Guide
+      </button>
+
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-xl bg-white p-5 text-neutral-800 shadow-xl dark:bg-neutral-900 dark:text-neutral-100"
+          >
+            <div className="flex items-start justify-between">
+              <h2 className="text-lg font-bold">🐺 What is this?</h2>
+              <button
+                onClick={() => setOpen(false)}
+                aria-label="Close"
+                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed">
+              Hunter at Hunt gathers NC State campus events every morning —
+              and sniffs out the ones giving away <b>free food, drinks,
+              t-shirts, and goodies</b>.
+            </p>
+            <h3 className="mt-4 text-sm font-bold">How to use</h3>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed">
+              <li>
+                Tap <b>🍕 Free Food</b> (or any chip) to filter. Tap again to
+                clear.
+              </li>
+              <li>
+                Narrow by day with <b>Today / Tomorrow / 📅 Dates</b>.
+              </li>
+              <li>Tap an event card to open its original page.</li>
+            </ul>
+            <p className="mt-4 text-xs text-neutral-400">
+              Data refreshes daily around 7 AM ET from official NC State
+              sources.
+            </p>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

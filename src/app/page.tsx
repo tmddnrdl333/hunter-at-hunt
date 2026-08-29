@@ -2,6 +2,7 @@ import { asc, gte } from 'drizzle-orm';
 import { db, schema } from '@/lib/db';
 import { EventList } from './EventList';
 import { FreshnessBanner } from './FreshnessBanner';
+import { GuideButton } from './GuideButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,13 +33,14 @@ export default async function Home() {
 
   return (
     <>
-      <header className="bg-[#a30404]">
+      <header className="relative bg-[#a30404]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/banner.png"
           alt="Hunter at Hunt — Free food hunter at NC State"
           className="mx-auto block h-auto w-full max-w-3xl"
         />
+        <GuideButton />
       </header>
       <FreshnessBanner />
       <main className="mx-auto max-w-3xl px-4 py-6">
