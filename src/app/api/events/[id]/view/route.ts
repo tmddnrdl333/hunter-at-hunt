@@ -10,9 +10,9 @@ export async function POST(
   if (!Number.isInteger(numId)) {
     return Response.json({ ok: false }, { status: 400 });
   }
-  db.update(schema.events)
+  await db
+    .update(schema.events)
     .set({ viewCount: sql`${schema.events.viewCount} + 1` })
-    .where(eq(schema.events.id, numId))
-    .run();
+    .where(eq(schema.events.id, numId));
   return Response.json({ ok: true });
 }
