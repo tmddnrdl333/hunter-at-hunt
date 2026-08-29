@@ -240,9 +240,19 @@ export function EventList({ events }: { events: EventItem[] }) {
       </div>
 
       {filtered.length === 0 && (
-        <p className="py-16 text-center text-stone-400">
-          Nothing found. The wolf sniffed everywhere — try clearing a filter.
-        </p>
+        <div className="py-12 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/not-found.png"
+            alt=""
+            className="mx-auto h-44 w-44 opacity-90"
+          />
+          <p className="mt-2 text-stone-500 dark:text-stone-400">
+            Nothing found. The wolf sniffed everywhere —
+            <br />
+            try clearing a filter.
+          </p>
+        </div>
       )}
 
       <ul>
@@ -316,6 +326,19 @@ export function EventList({ events }: { events: EventItem[] }) {
       </ul>
       {visible.length < filtered.length && (
         <p className="py-4 text-center text-xs text-stone-400">Loading more…</p>
+      )}
+      {filtered.length > 0 && visible.length >= filtered.length && (
+        <div className="py-10 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/wolf-footprint.png"
+            alt=""
+            className="mx-auto h-10 w-auto opacity-50 dark:opacity-40 dark:grayscale dark:invert"
+          />
+          <p className="mt-3 text-xs text-stone-400">
+            End of the trail — check back tomorrow 🐺
+          </p>
+        </div>
       )}
     </div>
   );

@@ -25,8 +25,14 @@ export function GuideButton() {
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-sm rounded-xl bg-white p-5 text-stone-800 shadow-xl dark:bg-stone-900 dark:text-stone-100"
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/happy-wolf.png"
+              alt=""
+              className="mx-auto -mt-1 h-28 w-28"
+            />
             <div className="flex items-start justify-between">
-              <h2 className="font-display text-lg font-bold">🐺 What is this?</h2>
+              <h2 className="font-display text-lg font-bold">What is this?</h2>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close"
