@@ -67,36 +67,31 @@ function shortDate(key: string): string {
   });
 }
 
-function formatWhen(iso: string): string {
-  const d = new Date(iso);
-  const date = d.toLocaleDateString('en-US', {
-    timeZone: TZ,
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-  const time = d.toLocaleTimeString('en-US', {
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', {
     timeZone: TZ,
     hour: 'numeric',
     minute: '2-digit',
   });
-  return `${date} · ${time}`;
 }
 
+/** 날짜 그룹 헤더: "Sat · Aug 29" */
 function dayKey(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
+  const d = new Date(iso);
+  const weekday = d.toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' });
+  const date = d.toLocaleDateString('en-US', {
     timeZone: TZ,
-    weekday: 'long',
-    month: 'long',
+    month: 'short',
     day: 'numeric',
   });
+  return `${weekday} · ${date}`;
 }
 
 function chipClass(active: boolean): string {
-  return `shrink-0 whitespace-nowrap rounded-full border px-3 py-0.5 text-sm transition-colors ${
+  return `shrink-0 whitespace-nowrap rounded-lg border px-3 py-0.5 text-sm transition-all active:scale-95 ${
     active
-      ? 'border-red-700 bg-red-700 text-white'
-      : 'border-neutral-300 bg-white text-neutral-700 hover:border-red-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200'
+      ? 'border-red-800 bg-red-800 text-white shadow-sm'
+      : 'border-stone-300 bg-white/70 text-stone-700 hover:border-red-700 hover:text-red-800 dark:border-stone-600 dark:bg-stone-800/70 dark:text-stone-200 dark:hover:text-red-300'
   }`;
 }
 
@@ -104,7 +99,7 @@ function chipClass(active: boolean): string {
 function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="no-scrollbar flex items-center gap-2 overflow-x-auto">
-      <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wider text-neutral-400">
+      <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wider text-stone-400">
         {label}
       </span>
       {children}
@@ -178,7 +173,8 @@ export function EventList({ events }: { events: EventItem[] }) {
 
   return (
     <div>
-      <div className="mb-4 space-y-2 rounded-xl bg-neutral-100 px-3 py-2.5 dark:bg-neutral-900">
+      {/* 스크롤해도 상단에 붙는 필터바 */}
+      <div className="sticky top-0 z-40 -mx-4 mb-2 space-y-2 border-b border-stone-200 bg-background/90 px-4 py-2.5 backdrop-blur dark:border-stone-800">
         <FilterRow label="Freebies">
           {(Object.keys(PERK_GROUP_LABELS) as PerkGroup[]).map((p) => (
             <button
@@ -216,14 +212,14 @@ export function EventList({ events }: { events: EventItem[] }) {
               type="date"
               value={rangeFrom}
               onChange={(e) => setRangeFrom(e.target.value)}
-              className="rounded-md border border-neutral-300 bg-white px-2 py-0.5 dark:border-neutral-600 dark:bg-neutral-800"
+              className="rounded-md border border-stone-300 bg-white/70 px-2 py-0.5 tabular-nums dark:border-stone-600 dark:bg-stone-800"
             />
-            <span className="text-neutral-400">–</span>
+            <span className="text-stone-400">–</span>
             <input
               type="date"
               value={rangeTo}
               onChange={(e) => setRangeTo(e.target.value)}
-              className="rounded-md border border-neutral-300 bg-white px-2 py-0.5 dark:border-neutral-600 dark:bg-neutral-800"
+              className="rounded-md border border-stone-300 bg-white/70 px-2 py-0.5 tabular-nums dark:border-stone-600 dark:bg-stone-800"
             />
           </div>
         )}
@@ -237,29 +233,33 @@ export function EventList({ events }: { events: EventItem[] }) {
               {CATEGORY_LABELS[c]}
             </button>
           ))}
+          <span className="ml-auto shrink-0 pl-2 text-xs tabular-nums text-stone-400">
+            {filtered.length} events
+          </span>
         </FilterRow>
-        <p className="text-right text-[11px] leading-none text-neutral-400">
-          {filtered.length} events
-        </p>
       </div>
 
       {filtered.length === 0 && (
-        <p className="py-12 text-center text-neutral-400">
-          No events match. Try clearing filters.
+        <p className="py-16 text-center text-stone-400">
+          Nothing found. The wolf sniffed everywhere — try clearing a filter.
         </p>
       )}
 
-      <ul className="space-y-3">
+      <ul>
         {visible.map((e) => {
           const day = dayKey(e.startsAt);
           const showDay = day !== lastDay;
           lastDay = day;
           const badgeGroups = [...new Set(e.perks.map((p) => PERK_GROUP_OF[p]))];
+          const hasFreebies = badgeGroups.length > 0;
           return (
             <li key={e.id}>
               {showDay && (
-                <h2 className="mb-2 mt-6 border-b border-neutral-200 pb-1 text-sm font-semibold uppercase tracking-wide text-red-700 first:mt-0 dark:border-neutral-800 dark:text-red-400">
-                  {day}
+                <h2 className="font-display mt-8 flex items-baseline gap-2 pb-2 text-2xl font-bold tracking-tight text-stone-900 first:mt-2 dark:text-stone-100">
+                  <span className="text-red-800 dark:text-red-400">
+                    {day.split(' · ')[0]}
+                  </span>
+                  <span>{day.split(' · ')[1]}</span>
                 </h2>
               )}
               <a
@@ -267,55 +267,55 @@ export function EventList({ events }: { events: EventItem[] }) {
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => countView(e.id)}
-                className="block rounded-lg border border-neutral-200 bg-white p-4 transition-shadow hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-600"
+                className={
+                  hasFreebies
+                    ? 'group mb-2 flex gap-3 rounded-xl border-l-4 border-red-800 bg-white p-3.5 shadow-sm transition-transform hover:translate-x-0.5 dark:bg-stone-800/80'
+                    : 'group flex gap-3 border-b border-stone-200/80 px-1 py-3 transition-transform hover:translate-x-0.5 dark:border-stone-800'
+                }
               >
-                <div className="flex gap-3">
-                  {e.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={e.imageUrl}
-                      alt=""
-                      loading="lazy"
-                      className="h-16 w-16 shrink-0 rounded-md object-cover"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold">{e.title}</h3>
-                      {badgeGroups.length > 0 ? (
-                        badgeGroups.map((g) => (
-                          <span
-                            key={g}
-                            className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300"
-                          >
-                            {PERK_GROUP_LABELS[g]}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
-                          No freebies
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-sm text-neutral-500">
-                      {formatWhen(e.startsAt)}
-                      {e.locationName ? ` · ${e.locationName}` : ''}
-                      {e.organizer ? ` · ${e.organizer}` : ''}
-                    </p>
-                    {e.summary && (
-                      <p className="mt-1 line-clamp-2 text-sm text-neutral-600 dark:text-neutral-400">
-                        {e.summary}
-                      </p>
-                    )}
+                <span className="w-[4.5rem] shrink-0 pt-0.5 font-mono text-xs tabular-nums text-stone-500">
+                  {formatTime(e.startsAt)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <h3 className="font-semibold leading-snug group-hover:underline group-hover:decoration-red-800/50 group-hover:underline-offset-2">
+                      {e.title}
+                    </h3>
+                    {badgeGroups.map((g) => (
+                      <span
+                        key={g}
+                        className="rounded-md bg-red-800/10 px-1.5 py-0.5 text-xs font-medium text-red-900 dark:bg-red-400/15 dark:text-red-300"
+                      >
+                        {PERK_GROUP_LABELS[g]}
+                      </span>
+                    ))}
                   </div>
+                  <p className="mt-0.5 text-sm text-stone-500 dark:text-stone-400">
+                    {e.locationName ?? 'Location TBA'}
+                    {e.organizer ? ` · ${e.organizer}` : ''}
+                  </p>
+                  {e.summary && (
+                    <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-stone-600 dark:text-stone-400">
+                      {e.summary}
+                    </p>
+                  )}
                 </div>
+                {e.imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={e.imageUrl}
+                    alt=""
+                    loading="lazy"
+                    className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                  />
+                )}
               </a>
             </li>
           );
         })}
       </ul>
       {visible.length < filtered.length && (
-        <p className="py-4 text-center text-xs text-neutral-400">Loading more…</p>
+        <p className="py-4 text-center text-xs text-stone-400">Loading more…</p>
       )}
     </div>
   );

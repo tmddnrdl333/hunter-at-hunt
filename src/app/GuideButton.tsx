@@ -23,14 +23,14 @@ export function GuideButton() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-xl bg-white p-5 text-neutral-800 shadow-xl dark:bg-neutral-900 dark:text-neutral-100"
+            className="w-full max-w-sm rounded-xl bg-white p-5 text-stone-800 shadow-xl dark:bg-stone-900 dark:text-stone-100"
           >
             <div className="flex items-start justify-between">
-              <h2 className="text-lg font-bold">🐺 What is this?</h2>
+              <h2 className="font-display text-lg font-bold">🐺 What is this?</h2>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close"
-                className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
               >
                 ✕
               </button>
@@ -51,7 +51,7 @@ export function GuideButton() {
               </li>
               <li>Tap an event card to open its original page.</li>
             </ul>
-            <p className="mt-4 text-xs text-neutral-400">
+            <p className="mt-4 text-xs text-stone-400">
               Data refreshes daily around 7 AM ET from official NC State
               sources.
             </p>

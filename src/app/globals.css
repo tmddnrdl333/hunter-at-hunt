@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
+/* 웜 뉴트럴 팔레트: 라이트는 크림 종이색, 다크는 따뜻한 차콜 */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #faf7f2;
+  --foreground: #292524;
 }
 
 @theme inline {
@@ -10,19 +11,20 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-bricolage);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #1c1917;
+    --foreground: #e7e5e4;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
 /* 필터 가로 스크롤 행: 스크롤바 숨김 */
