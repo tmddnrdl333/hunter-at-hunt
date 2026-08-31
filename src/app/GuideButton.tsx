@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useLockBodyScroll } from '@/lib/use-lock-scroll';
 
 /** 가이드 버튼 + 서비스 소개 팝업 (플로팅 독 안에서 사용) */
 export function GuideButton({ className }: { className: string }) {
   const [open, setOpen] = useState(false);
+  useLockBodyScroll(open);
 
   return (
     <>

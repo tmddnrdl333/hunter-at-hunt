@@ -1,6 +1,7 @@
 'use client';
 
 import { signInWithGoogle } from '@/lib/supabase/client';
+import { useLockBodyScroll } from '@/lib/use-lock-scroll';
 
 /** 로그인 유도 모달 — 게이팅된 기능 클릭 또는 헤더 Sign in에서 열림 */
 export function SignInModal({
@@ -14,6 +15,7 @@ export function SignInModal({
   next?: string;
   message?: string;
 }) {
+  useLockBodyScroll(open);
   if (!open) return null;
   return (
     <div

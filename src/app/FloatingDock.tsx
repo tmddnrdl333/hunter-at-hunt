@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { signOut } from '@/lib/supabase/client';
 import { FeedbackButton } from './FeedbackButton';
 import { GuideButton } from './GuideButton';
@@ -28,11 +28,26 @@ export function FloatingDock({
 }) {
   const [signInOpen, setSignInOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Account 메뉴 밖을 클릭하면 닫기
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+    };
+  }, [menuOpen]);
 
   return (
     // 주의: 이 트리에 backdrop-blur/transform을 주면 안 됨 —
     // 자손 모달(position: fixed)의 기준이 뷰포트가 아니게 되어 팝업이 독 안에 갇힌다
-    <div className="fixed bottom-4 left-4 z-40">
+    <div ref={wrapRef} className="fixed bottom-4 left-4 z-40">
       {menuOpen && userEmail && (
         <div className="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-stone-200 bg-white p-2 shadow-lg dark:border-stone-700 dark:bg-stone-900">
           <p className="truncate px-2 py-1 text-xs text-stone-400">{userEmail}</p>

@@ -32,5 +32,6 @@ export async function signInWithGoogle(next?: string) {
 export async function signOut() {
   const supabase = createClient();
   await supabase.auth.signOut();
-  window.location.reload();
+  // 로그아웃 토스트를 띄우기 위한 신호와 함께 홈으로
+  window.location.href = '/?auth=signedout';
 }

@@ -2,6 +2,7 @@ import { asc, count, eq, gte } from 'drizzle-orm';
 import { db, schema } from '@/lib/db';
 import { getAuthedUser, supabaseConfigured } from '@/lib/supabase/server';
 import { AuthErrorModal } from './AuthErrorModal';
+import { AuthToast } from './AuthToast';
 import { EventList } from './EventList';
 import { FloatingDock } from './FloatingDock';
 import { FreshnessBanner } from './FreshnessBanner';
@@ -17,7 +18,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ auth_error?: string }>;
+  searchParams: Promise<{ auth_error?: string; auth?: string }>;
 }) {
   const now = new Date().toISOString();
   const [rows, likeRows, user, params] = await Promise.all([
@@ -80,6 +81,9 @@ export default async function Home({
       <FreshnessBanner />
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-6">
         {authError && <AuthErrorModal message={authError} />}
+        {(params.auth === 'signedin' || params.auth === 'signedout') && (
+          <AuthToast kind={params.auth} email={user?.email} />
+        )}
         <EventList
           events={events}
           authEnabled={supabaseConfigured}

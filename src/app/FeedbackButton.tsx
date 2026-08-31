@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLockBodyScroll } from '@/lib/use-lock-scroll';
 import { SignInModal } from './SignInModal';
 
 /** 플로팅 독의 피드백 버튼 — 로그인 필요, 제출 시 운영자 이메일로 발송 */
@@ -16,6 +17,7 @@ export function FeedbackButton({
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  useLockBodyScroll(open);
 
   const close = () => {
     setOpen(false);

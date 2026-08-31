@@ -29,5 +29,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/?auth_error=domain`);
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  // 로그인 성공 토스트 신호를 붙여서 원래 페이지로
+  const dest = new URL(next, origin);
+  dest.searchParams.set('auth', 'signedin');
+  return NextResponse.redirect(dest);
 }
