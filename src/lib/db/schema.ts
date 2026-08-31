@@ -51,11 +51,11 @@ export type EventRow = typeof events.$inferSelect;
  * events는 upcoming 2주만 유지하고, 히스토리는 여기에만 쌓인다.
  */
 /**
- * 사용자 즐겨찾기. user_id는 Supabase auth.users의 id (별도 profile 테이블 없음).
- * 접근은 항상 서버 API를 거치며 서버에서 인증을 확인한다.
+ * 이벤트 좋아요. user_id는 Supabase auth.users의 id (별도 profile 테이블 없음).
+ * 개수는 모두에게 공개, 누르기는 로그인 필요. 접근은 항상 서버 API 경유.
  */
-export const favorites = pgTable(
-  'favorites',
+export const likes = pgTable(
+  'likes',
   {
     userId: uuid('user_id').notNull(),
     eventId: integer('event_id').notNull(),

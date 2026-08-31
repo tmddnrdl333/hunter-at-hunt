@@ -19,6 +19,7 @@ export interface EventItem {
   sourceUrl: string | null;
   source: string;
   viewCount: number;
+  likeCount: number;
 }
 
 /** UI 필터/뱃지는 4종으로 단순화 — swag/prize/free_stuff는 Goodies로 묶음 */
@@ -112,21 +113,21 @@ export function EventList({
   events,
   authEnabled,
   userSignedIn,
-  initialFavorites,
+  initialLikes,
 }: {
   events: EventItem[];
-  /** Supabase Auth 설정 여부 — false면 즐겨찾기 UI를 숨김 (데모 모드) */
+  /** Supabase Auth 설정 여부 — false면 좋아요 UI를 숨김 (데모 모드) */
   authEnabled: boolean;
   userSignedIn: boolean;
-  initialFavorites: number[];
+  initialLikes: number[];
 }) {
   const [perkFilter, setPerkFilter] = useState<PerkGroup | null>(null);
   const [whenFilter, setWhenFilter] = useState<WhenFilter>(null);
   const [catFilter, setCatFilter] = useState<Category | null>(null);
-  const [savedOnly, setSavedOnly] = useState(false);
-  const [favorites, setFavorites] = useState<Set<number>>(
-    () => new Set(initialFavorites),
-  );
+  const [likedOnly, setLikedOnly] = useState(false);
+  const [myLikes, setMyLikes] = useState<Set<number>>(() => new Set(initialLikes));
+  /** 낙관적 카운트 보정: eventId → +1/-1 (서버 값 대비) */
+  const [likeDelta, setLikeDelta] = useState<Map<number, number>>(new Map());
   const [signInOpen, setSignInOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const totalRef = useRef(0);
@@ -152,14 +153,14 @@ export function EventList({
       });
     }
     if (catFilter) list = list.filter((e) => e.category === catFilter);
-    if (savedOnly) list = list.filter((e) => favorites.has(e.id));
+    if (likedOnly) list = list.filter((e) => myLikes.has(e.id));
     return list;
-  }, [events, perkFilter, whenFilter, catFilter, savedOnly, favorites, todayKey, tomorrowKey, rangeFrom, rangeTo]);
+  }, [events, perkFilter, whenFilter, catFilter, likedOnly, myLikes, todayKey, tomorrowKey, rangeFrom, rangeTo]);
 
   // 필터가 바뀌면 무한스크롤 처음부터
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [perkFilter, whenFilter, catFilter, savedOnly, rangeFrom, rangeTo]);
+  }, [perkFilter, whenFilter, catFilter, likedOnly, rangeFrom, rangeTo]);
 
   // 무한 스크롤: 바닥 근처에 오면 다음 페이지 렌더
   totalRef.current = filtered.length;
@@ -187,21 +188,30 @@ export function EventList({
     fetch(`/api/events/${id}/view`, { method: 'POST' }).catch(() => {});
   };
 
-  const toggleFavorite = (id: number) => {
+  const applyLike = (id: number, liked: boolean) => {
+    setMyLikes((prev) => {
+      const next = new Set(prev);
+      if (liked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    setLikeDelta((prev) => {
+      const next = new Map(prev);
+      next.set(id, (next.get(id) ?? 0) + (liked ? 1 : -1));
+      return next;
+    });
+  };
+
+  const toggleLike = (id: number) => {
     if (!userSignedIn) {
-      // 비로그인 상태에서 별을 누르면 로그인 유도 (로그인 후 이 페이지로 복귀)
+      // 비로그인 상태에서 좋아요를 누르면 로그인 유도 (로그인 후 이 페이지로 복귀)
       setSignInOpen(true);
       return;
     }
     // 낙관적 업데이트 후 서버 동기화, 실패 시 롤백
-    const wasSaved = favorites.has(id);
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (wasSaved) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    fetch('/api/favorites', {
+    const wasLiked = myLikes.has(id);
+    applyLike(id, !wasLiked);
+    fetch('/api/likes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId: id }),
@@ -209,14 +219,7 @@ export function EventList({
       .then((r) => {
         if (!r.ok) throw new Error(String(r.status));
       })
-      .catch(() => {
-        setFavorites((prev) => {
-          const next = new Set(prev);
-          if (wasSaved) next.add(id);
-          else next.delete(id);
-          return next;
-        });
-      });
+      .catch(() => applyLike(id, wasLiked));
   };
 
   let lastDay = '';
@@ -290,11 +293,11 @@ export function EventList({
                   setSignInOpen(true);
                   return;
                 }
-                setSavedOnly(!savedOnly);
+                setLikedOnly(!likedOnly);
               }}
-              className={chipClass(savedOnly)}
+              className={chipClass(likedOnly)}
             >
-              ⭐ Saved
+              👍 Liked
             </button>
           )}
           <span className="ml-auto shrink-0 pl-2 text-xs tabular-nums text-stone-400">
@@ -393,16 +396,16 @@ export function EventList({
                     onClick={(ev) => {
                       ev.preventDefault();
                       ev.stopPropagation();
-                      toggleFavorite(e.id);
+                      toggleLike(e.id);
                     }}
-                    aria-label={favorites.has(e.id) ? 'Unsave event' : 'Save event'}
-                    className={`shrink-0 self-start text-lg leading-none transition-transform active:scale-90 ${
-                      favorites.has(e.id)
-                        ? 'opacity-100'
-                        : 'opacity-25 grayscale hover:opacity-60 hover:grayscale-0'
+                    aria-label={myLikes.has(e.id) ? 'Unlike event' : 'Like event'}
+                    className={`flex shrink-0 items-center gap-1 self-start rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums transition-all active:scale-90 ${
+                      myLikes.has(e.id)
+                        ? 'border-red-800 bg-red-800 text-white'
+                        : 'border-stone-300 bg-white/70 text-stone-500 hover:border-red-700 hover:text-red-800 dark:border-stone-600 dark:bg-stone-800/70 dark:text-stone-400'
                     }`}
                   >
-                    ⭐
+                    👍 {Math.max(0, e.likeCount + (likeDelta.get(e.id) ?? 0))}
                   </button>
                 )}
               </a>
