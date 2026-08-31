@@ -1,6 +1,7 @@
 import { asc, count, eq, gte } from 'drizzle-orm';
 import { db, schema } from '@/lib/db';
 import { getAuthedUser, supabaseConfigured } from '@/lib/supabase/server';
+import { AuthErrorModal } from './AuthErrorModal';
 import { EventList } from './EventList';
 import { FloatingDock } from './FloatingDock';
 import { FreshnessBanner } from './FreshnessBanner';
@@ -78,11 +79,7 @@ export default async function Home({
       </header>
       <FreshnessBanner />
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-6">
-        {authError && (
-          <p className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
-            {authError}
-          </p>
-        )}
+        {authError && <AuthErrorModal message={authError} />}
         <EventList
           events={events}
           authEnabled={supabaseConfigured}
