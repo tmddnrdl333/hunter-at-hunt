@@ -1,4 +1,4 @@
-import { asc, count, eq, gte } from 'drizzle-orm';
+import { asc, count, eq, sql } from 'drizzle-orm';
 import { db, schema } from '@/lib/db';
 import { getAuthedUser, supabaseConfigured } from '@/lib/supabase/server';
 import { AuthErrorModal } from './AuthErrorModal';
@@ -20,12 +20,14 @@ export default async function Home({
 }: {
   searchParams: Promise<{ auth_error?: string; auth?: string }>;
 }) {
-  const now = new Date().toISOString();
   const [rows, likeRows, user, params] = await Promise.all([
+    // 종료 시각까지 유지 (종료 시각이 없으면 시작 +2시간까지)
     db
       .select()
       .from(schema.events)
-      .where(gte(schema.events.startsAt, now))
+      .where(
+        sql`coalesce(${schema.events.endsAt}::timestamptz, ${schema.events.startsAt}::timestamptz + interval '2 hours') >= now()`,
+      )
       .orderBy(asc(schema.events.startsAt)),
     db
       .select({ eventId: schema.likes.eventId, likeCount: count() })

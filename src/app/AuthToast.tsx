@@ -33,10 +33,11 @@ export function AuthToast({
       : '👋 Signed out. See you at the next hunt!';
 
   return (
+    // bottom-20: 좌하단 플로팅 독(약 64px) 위에 떠서 좁은 화면에서도 겹치지 않음
     <div
       role="status"
-      className={`fixed left-1/2 top-4 z-50 -translate-x-1/2 whitespace-nowrap rounded-full bg-stone-900/95 px-4 py-2 text-sm font-medium text-white shadow-lg transition-all duration-300 dark:bg-white/95 dark:text-stone-900 ${
-        visible ? 'translate-y-0 opacity-100' : '-translate-y-3 opacity-0'
+      className={`fixed bottom-20 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full bg-stone-900/95 px-4 py-2 text-sm font-medium text-white shadow-lg transition-all duration-300 dark:bg-white/95 dark:text-stone-900 ${
+        visible ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
       }`}
     >
       {message}
