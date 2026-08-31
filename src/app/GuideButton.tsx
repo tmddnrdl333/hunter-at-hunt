@@ -11,7 +11,7 @@ export function GuideButton() {
       <button
         onClick={() => setOpen(true)}
         aria-label="How to use"
-        className="absolute right-3 top-3 rounded-full bg-black/30 px-3 py-1 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-black/50"
+        className="rounded-full bg-black/30 px-3 py-1 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-black/50"
       >
         ? Guide
       </button>

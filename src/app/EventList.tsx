@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Category, Perk } from '@/lib/types';
+import { SignInModal } from './SignInModal';
 
 export interface EventItem {
   id: number;
@@ -107,10 +108,26 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-export function EventList({ events }: { events: EventItem[] }) {
+export function EventList({
+  events,
+  authEnabled,
+  userSignedIn,
+  initialFavorites,
+}: {
+  events: EventItem[];
+  /** Supabase Auth 설정 여부 — false면 즐겨찾기 UI를 숨김 (데모 모드) */
+  authEnabled: boolean;
+  userSignedIn: boolean;
+  initialFavorites: number[];
+}) {
   const [perkFilter, setPerkFilter] = useState<PerkGroup | null>(null);
   const [whenFilter, setWhenFilter] = useState<WhenFilter>(null);
   const [catFilter, setCatFilter] = useState<Category | null>(null);
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [favorites, setFavorites] = useState<Set<number>>(
+    () => new Set(initialFavorites),
+  );
+  const [signInOpen, setSignInOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const totalRef = useRef(0);
   const todayKey = etDateKey(new Date());
@@ -135,13 +152,14 @@ export function EventList({ events }: { events: EventItem[] }) {
       });
     }
     if (catFilter) list = list.filter((e) => e.category === catFilter);
+    if (savedOnly) list = list.filter((e) => favorites.has(e.id));
     return list;
-  }, [events, perkFilter, whenFilter, catFilter, todayKey, tomorrowKey, rangeFrom, rangeTo]);
+  }, [events, perkFilter, whenFilter, catFilter, savedOnly, favorites, todayKey, tomorrowKey, rangeFrom, rangeTo]);
 
   // 필터가 바뀌면 무한스크롤 처음부터
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [perkFilter, whenFilter, catFilter, rangeFrom, rangeTo]);
+  }, [perkFilter, whenFilter, catFilter, savedOnly, rangeFrom, rangeTo]);
 
   // 무한 스크롤: 바닥 근처에 오면 다음 페이지 렌더
   totalRef.current = filtered.length;
@@ -167,6 +185,38 @@ export function EventList({ events }: { events: EventItem[] }) {
   const countView = (id: number) => {
     // fire-and-forget 조회수 집계
     fetch(`/api/events/${id}/view`, { method: 'POST' }).catch(() => {});
+  };
+
+  const toggleFavorite = (id: number) => {
+    if (!userSignedIn) {
+      // 비로그인 상태에서 별을 누르면 로그인 유도 (로그인 후 이 페이지로 복귀)
+      setSignInOpen(true);
+      return;
+    }
+    // 낙관적 업데이트 후 서버 동기화, 실패 시 롤백
+    const wasSaved = favorites.has(id);
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (wasSaved) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    fetch('/api/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: id }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+      })
+      .catch(() => {
+        setFavorites((prev) => {
+          const next = new Set(prev);
+          if (wasSaved) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+      });
   };
 
   let lastDay = '';
@@ -233,11 +283,30 @@ export function EventList({ events }: { events: EventItem[] }) {
               {CATEGORY_LABELS[c]}
             </button>
           ))}
+          {authEnabled && (
+            <button
+              onClick={() => {
+                if (!userSignedIn) {
+                  setSignInOpen(true);
+                  return;
+                }
+                setSavedOnly(!savedOnly);
+              }}
+              className={chipClass(savedOnly)}
+            >
+              ⭐ Saved
+            </button>
+          )}
           <span className="ml-auto shrink-0 pl-2 text-xs tabular-nums text-stone-400">
             {filtered.length} events
           </span>
         </FilterRow>
       </div>
+      <SignInModal
+        open={signInOpen}
+        onClose={() => setSignInOpen(false)}
+        message="Sign in to save events you don't want to miss."
+      />
 
       {filtered.length === 0 && (
         <div className="py-12 text-center">
@@ -318,6 +387,23 @@ export function EventList({ events }: { events: EventItem[] }) {
                     loading="lazy"
                     className="h-14 w-14 shrink-0 rounded-lg object-cover"
                   />
+                )}
+                {authEnabled && (
+                  <button
+                    onClick={(ev) => {
+                      ev.preventDefault();
+                      ev.stopPropagation();
+                      toggleFavorite(e.id);
+                    }}
+                    aria-label={favorites.has(e.id) ? 'Unsave event' : 'Save event'}
+                    className={`shrink-0 self-start text-lg leading-none transition-transform active:scale-90 ${
+                      favorites.has(e.id)
+                        ? 'opacity-100'
+                        : 'opacity-25 grayscale hover:opacity-60 hover:grayscale-0'
+                    }`}
+                  >
+                    ⭐
+                  </button>
                 )}
               </a>
             </li>

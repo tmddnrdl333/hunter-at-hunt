@@ -4,8 +4,10 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   uniqueIndex,
+  uuid,
 } from 'drizzle-orm/pg-core';
 import type { Perk } from '../types';
 
@@ -48,6 +50,20 @@ export type EventRow = typeof events.$inferSelect;
  * 수집 원본 로그 (append-only). 서빙 테이블(events)과 분리 —
  * events는 upcoming 2주만 유지하고, 히스토리는 여기에만 쌓인다.
  */
+/**
+ * 사용자 즐겨찾기. user_id는 Supabase auth.users의 id (별도 profile 테이블 없음).
+ * 접근은 항상 서버 API를 거치며 서버에서 인증을 확인한다.
+ */
+export const favorites = pgTable(
+  'favorites',
+  {
+    userId: uuid('user_id').notNull(),
+    eventId: integer('event_id').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.eventId] })],
+);
+
 export const rawEvents = pgTable('raw_events', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   runAt: text('run_at').notNull(),
