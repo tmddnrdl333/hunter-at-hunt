@@ -126,8 +126,10 @@ export function EventList({
   const [catFilter, setCatFilter] = useState<Category | null>(null);
   const [likedOnly, setLikedOnly] = useState(false);
   const [myLikes, setMyLikes] = useState<Set<number>>(() => new Set(initialLikes));
-  /** 낙관적 카운트 보정: eventId → +1/-1 (서버 값 대비) */
+  /** 낙관적 카운트 보정: eventId → +1/-1 (서버 응답이 오면 override로 대체) */
   const [likeDelta, setLikeDelta] = useState<Map<number, number>>(new Map());
+  /** 서버가 응답으로 알려준 정확한 카운트 — 표시 시 최우선 */
+  const [countOverride, setCountOverride] = useState<Map<number, number>>(new Map());
   const [signInOpen, setSignInOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const totalRef = useRef(0);
@@ -208,16 +210,24 @@ export function EventList({
       setSignInOpen(true);
       return;
     }
-    // 낙관적 업데이트 후 서버 동기화, 실패 시 롤백
+    // 낙관적 업데이트 → 서버에 목표 상태 전송 → 응답의 정확한 카운트로 교정
     const wasLiked = myLikes.has(id);
-    applyLike(id, !wasLiked);
+    const wantLiked = !wasLiked;
+    applyLike(id, wantLiked);
     fetch('/api/likes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ eventId: id }),
+      body: JSON.stringify({ eventId: id, liked: wantLiked }),
     })
-      .then((r) => {
+      .then(async (r) => {
         if (!r.ok) throw new Error(String(r.status));
+        const data = (await r.json()) as { liked: boolean; likeCount: number };
+        setCountOverride((prev) => new Map(prev).set(id, data.likeCount));
+        setLikeDelta((prev) => {
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
       })
       .catch(() => applyLike(id, wasLiked));
   };
@@ -405,7 +415,9 @@ export function EventList({
                         : 'border-stone-300 bg-white/70 text-stone-500 hover:border-red-700 hover:text-red-800 dark:border-stone-600 dark:bg-stone-800/70 dark:text-stone-400'
                     }`}
                   >
-                    👍 {Math.max(0, e.likeCount + (likeDelta.get(e.id) ?? 0))}
+                    👍{' '}
+                    {countOverride.get(e.id) ??
+                      Math.max(0, e.likeCount + (likeDelta.get(e.id) ?? 0))}
                   </button>
                 )}
               </a>
