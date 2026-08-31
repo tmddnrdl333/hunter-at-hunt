@@ -6,10 +6,19 @@ import { FeedbackButton } from './FeedbackButton';
 import { GuideButton } from './GuideButton';
 import { SignInModal } from './SignInModal';
 
+/**
+ * 독 버튼 공통 스타일 — 바는 하나로 이어져 보이되, 각 버튼은 hover/press 시
+ * 개별적으로 눌리는 느낌(자체 라운드 + 배경 하이라이트 + scale).
+ */
 const SEGMENT_CLASS =
-  'px-3 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 dark:text-stone-200 dark:hover:bg-stone-800';
+  'rounded-lg px-3 py-2 text-sm font-semibold text-white transition-all hover:bg-white/15 active:scale-95 whitespace-nowrap';
 
-/** 좌하단 플로팅 메뉴: Sign in/계정 · Guide · Feedback (구분선으로 분리) */
+/** 버튼 사이 구분선 — 위아래가 바 가장자리에 닿지 않는 짧은 선 */
+function Divider() {
+  return <div aria-hidden className="h-5 w-px shrink-0 bg-white/30" />;
+}
+
+/** 좌하단 플로팅 독: Sign in/계정 · Guide · Feedback */
 export function FloatingDock({
   authEnabled,
   userEmail,
@@ -21,6 +30,8 @@ export function FloatingDock({
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
+    // 주의: 이 트리에 backdrop-blur/transform을 주면 안 됨 —
+    // 자손 모달(position: fixed)의 기준이 뷰포트가 아니게 되어 팝업이 독 안에 갇힌다
     <div className="fixed bottom-4 left-4 z-40">
       {menuOpen && userEmail && (
         <div className="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-stone-200 bg-white p-2 shadow-lg dark:border-stone-700 dark:bg-stone-900">
@@ -33,27 +44,34 @@ export function FloatingDock({
           </button>
         </div>
       )}
-      <div className="flex items-stretch divide-x divide-stone-200 overflow-hidden rounded-xl border border-stone-200 bg-white/95 shadow-lg backdrop-blur dark:divide-stone-700 dark:border-stone-700 dark:bg-stone-900/95">
-        {authEnabled &&
-          (userEmail ? (
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="Account"
-              className={SEGMENT_CLASS}
-            >
-              <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-800 text-xs font-bold text-white">
-                {userEmail[0].toUpperCase()}
-              </span>
-              Account
-            </button>
-          ) : (
-            <button onClick={() => setSignInOpen(true)} className={SEGMENT_CLASS}>
-              Sign in
-            </button>
-          ))}
+      <div className="flex items-center gap-1 rounded-2xl bg-red-800 p-1.5 shadow-lg shadow-red-950/40 ring-1 ring-red-950/40">
+        {authEnabled && (
+          <>
+            {userEmail ? (
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                aria-label="Account"
+                className={SEGMENT_CLASS}
+              >
+                <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-red-800">
+                  {userEmail[0].toUpperCase()}
+                </span>
+                Account
+              </button>
+            ) : (
+              <button onClick={() => setSignInOpen(true)} className={SEGMENT_CLASS}>
+                🔑 Sign in
+              </button>
+            )}
+            <Divider />
+          </>
+        )}
         <GuideButton className={SEGMENT_CLASS} />
         {authEnabled && (
-          <FeedbackButton userSignedIn={!!userEmail} className={SEGMENT_CLASS} />
+          <>
+            <Divider />
+            <FeedbackButton userSignedIn={!!userEmail} className={SEGMENT_CLASS} />
+          </>
         )}
       </div>
       <SignInModal open={signInOpen} onClose={() => setSignInOpen(false)} />
