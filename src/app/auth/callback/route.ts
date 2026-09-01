@@ -9,12 +9,23 @@ import { createClient, isNcsuEmail } from '@/lib/supabase/server';
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
-  // open redirect 방지: 상대 경로만 허용
-  const nextParam = searchParams.get('next') ?? '/';
-  const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/';
+
+  // open redirect 방지: 문자열 검사 대신 파싱 결과의 origin을 비교 —
+  // "/\evil.com" 같은 백슬래시 파서 quirk까지 한 번에 차단된다
+  let next = '/';
+  try {
+    const parsed = new URL(searchParams.get('next') ?? '/', origin);
+    if (parsed.origin === origin) next = parsed.pathname + parsed.search;
+  } catch {
+    /* 파싱 불가 → '/' 유지 */
+  }
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/?auth_error=missing_code`);
+    // 사용자가 구글 화면에서 취소한 경우 등 (?error=access_denied)
+    const provider_error = searchParams.get('error');
+    return NextResponse.redirect(
+      `${origin}/?auth_error=${provider_error ? 'denied' : 'missing_code'}`,
+    );
   }
 
   const supabase = await createClient();

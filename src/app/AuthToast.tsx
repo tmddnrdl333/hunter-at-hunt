@@ -37,7 +37,9 @@ export function AuthToast({
     <div
       role="status"
       className={`fixed bottom-20 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full bg-stone-900/95 px-4 py-2 text-sm font-medium text-white shadow-lg transition-all duration-300 dark:bg-white/95 dark:text-stone-900 ${
-        visible ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
+        visible
+          ? 'translate-y-0 opacity-100'
+          : 'pointer-events-none translate-y-3 opacity-0'
       }`}
     >
       {message}

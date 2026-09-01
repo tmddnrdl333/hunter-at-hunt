@@ -58,11 +58,21 @@ export const likes = pgTable(
   'likes',
   {
     userId: uuid('user_id').notNull(),
-    eventId: integer('event_id').notNull(),
+    // FK cascade: 이벤트가 purge되면 좋아요도 함께 삭제 (고아 행 방지)
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
     createdAt: text('created_at').notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.eventId] })],
 );
+
+/** 피드백 발송 기록 — 사용자별 레이트 리밋 용도 */
+export const feedbackLog = pgTable('feedback_log', {
+  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+  userId: uuid('user_id').notNull(),
+  createdAt: text('created_at').notNull(),
+});
 
 export const rawEvents = pgTable('raw_events', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),

@@ -1,10 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr';
 
-/** Supabase Auth 설정 여부 — 없으면(데모 모드 등) 로그인 UI를 통째로 숨긴다 */
-export const supabaseConfigured = !!(
-  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,6 +27,7 @@ export async function signInWithGoogle(next?: string) {
 export async function signOut() {
   const supabase = createClient();
   await supabase.auth.signOut();
-  // 로그아웃 토스트를 띄우기 위한 신호와 함께 홈으로
+  // 하드 내비게이션 의도: 서버 렌더 상태(좋아요/계정 UI)를 세션 없이 다시 받아야 함
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.href = '/?auth=signedout';
 }

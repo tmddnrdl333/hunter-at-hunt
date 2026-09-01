@@ -126,10 +126,12 @@ export function EventList({
   const [catFilter, setCatFilter] = useState<Category | null>(null);
   const [likedOnly, setLikedOnly] = useState(false);
   const [myLikes, setMyLikes] = useState<Set<number>>(() => new Set(initialLikes));
-  /** 낙관적 카운트 보정: eventId → +1/-1 (서버 응답이 오면 override로 대체) */
+  /** 낙관적 카운트 보정: eventId → 누적 delta (서버 확정치 위에 항상 더해짐) */
   const [likeDelta, setLikeDelta] = useState<Map<number, number>>(new Map());
-  /** 서버가 응답으로 알려준 정확한 카운트 — 표시 시 최우선 */
+  /** 서버가 응답으로 알려준 확정 카운트 — 초기 서버렌더 값(e.likeCount)을 대체하는 baseline */
   const [countOverride, setCountOverride] = useState<Map<number, number>>(new Map());
+  /** 이벤트별 요청 시퀀스 — 연타 시 늦게 도착한 오래된 응답을 버리기 위함 */
+  const likeSeqRef = useRef<Map<number, number>>(new Map());
   const [signInOpen, setSignInOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const totalRef = useRef(0);
@@ -210,10 +212,12 @@ export function EventList({
       setSignInOpen(true);
       return;
     }
-    // 낙관적 업데이트 → 서버에 목표 상태 전송 → 응답의 정확한 카운트로 교정
+    // 낙관적 업데이트 → 서버에 목표 상태 전송 → 최신 응답의 확정 카운트로 교정
     const wasLiked = myLikes.has(id);
     const wantLiked = !wasLiked;
     applyLike(id, wantLiked);
+    const seq = (likeSeqRef.current.get(id) ?? 0) + 1;
+    likeSeqRef.current.set(id, seq);
     fetch('/api/likes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -222,6 +226,8 @@ export function EventList({
       .then(async (r) => {
         if (!r.ok) throw new Error(String(r.status));
         const data = (await r.json()) as { liked: boolean; likeCount: number };
+        // 이 응답보다 새 요청이 이미 나갔다면(연타) 오래된 응답은 무시
+        if (likeSeqRef.current.get(id) !== seq) return;
         setCountOverride((prev) => new Map(prev).set(id, data.likeCount));
         setLikeDelta((prev) => {
           const next = new Map(prev);
@@ -229,7 +235,10 @@ export function EventList({
           return next;
         });
       })
-      .catch(() => applyLike(id, wasLiked));
+      .catch(() => {
+        if (likeSeqRef.current.get(id) !== seq) return;
+        applyLike(id, wasLiked);
+      });
   };
 
   let lastDay = '';
@@ -416,8 +425,11 @@ export function EventList({
                     }`}
                   >
                     👍{' '}
-                    {countOverride.get(e.id) ??
-                      Math.max(0, e.likeCount + (likeDelta.get(e.id) ?? 0))}
+                    {Math.max(
+                      0,
+                      (countOverride.get(e.id) ?? e.likeCount) +
+                        (likeDelta.get(e.id) ?? 0),
+                    )}
                   </button>
                 )}
               </a>
