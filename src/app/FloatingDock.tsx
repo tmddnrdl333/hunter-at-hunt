@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { signOut } from '@/lib/supabase/client';
+import { useEscapeKey } from '@/lib/use-escape';
 import { FeedbackButton } from './FeedbackButton';
 import { GuideButton } from './GuideButton';
 import { SignInModal } from './SignInModal';
@@ -29,6 +30,7 @@ export function FloatingDock({
   const [signInOpen, setSignInOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  useEscapeKey(menuOpen, () => setMenuOpen(false));
 
   // Account 메뉴 밖을 클릭하면 닫기
   useEffect(() => {

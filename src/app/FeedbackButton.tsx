@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useEscapeKey } from '@/lib/use-escape';
 import { useLockBodyScroll } from '@/lib/use-lock-scroll';
 import { SignInModal } from './SignInModal';
 
@@ -23,6 +24,7 @@ export function FeedbackButton({
     setOpen(false);
     setStatus('idle');
   };
+  useEscapeKey(open, close);
 
   const submit = async () => {
     if (!title.trim() || !content.trim() || status === 'sending') return;

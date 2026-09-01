@@ -72,7 +72,9 @@ export default async function Home({
 
   return (
     <>
-      <header className="bg-[#a30404]">
+      {/* 배너(중앙 max-w-3xl=48rem) 좌/우 가장자리 열의 실측 평균색을 양옆 밴드에 정확히 매칭 —
+          그라데이션 정지점을 배너 경계(50%±24rem)에 두어 밴드 영역은 각각 단색이 된다 */}
+      <header className="bg-[linear-gradient(to_right,#870101_calc(50%-24rem),#b80101_calc(50%+24rem))]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/banner.png"

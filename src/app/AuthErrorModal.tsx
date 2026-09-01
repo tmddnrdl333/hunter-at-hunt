@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { signInWithGoogle } from '@/lib/supabase/client';
+import { useEscapeKey } from '@/lib/use-escape';
 import { useLockBodyScroll } from '@/lib/use-lock-scroll';
 
 /** 로그인 실패 시 뜨는 팝업. URL의 ?auth_error는 표시 후 지워서 새로고침 시 재등장 방지. */
 export function AuthErrorModal({ message }: { message: string }) {
   const [open, setOpen] = useState(true);
   useLockBodyScroll(open);
+  useEscapeKey(open, () => setOpen(false));
 
   useEffect(() => {
     const url = new URL(window.location.href);
