@@ -1,4 +1,4 @@
-import { asc, count, eq, sql } from 'drizzle-orm';
+import { asc, count, eq, gt, sql } from 'drizzle-orm';
 import { db, schema } from '@/lib/db';
 import { getAuthedUser, supabaseConfigured } from '@/lib/supabase/server';
 import { AuthErrorModal } from './AuthErrorModal';
@@ -52,13 +52,20 @@ export default async function Home({
     ? (AUTH_ERROR_MESSAGES[params.auth_error] ?? AUTH_ERROR_MESSAGES.denied)
     : null;
 
-  // 🔥 인기: 좋아요×3 + 조회수 점수가 문턱(3) 이상인 것 중 상위 3개
-  const scored = rows
-    .map((r) => ({ id: r.id, score: (likeCountMap.get(r.id) ?? 0) * 3 + r.viewCount }))
-    .filter((s) => s.score >= 3)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
-  const trendingIds = new Set(scored.map((s) => s.id));
+  // 🔥 인기: 최근 7일간 받은 좋아요가 5개 이상인 것 중 상위 3개
+  const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const weeklyLikes = await db
+    .select({ eventId: schema.likes.eventId, weekly: count() })
+    .from(schema.likes)
+    .where(gt(schema.likes.createdAt, weekAgo))
+    .groupBy(schema.likes.eventId);
+  const trendingIds = new Set(
+    weeklyLikes
+      .filter((w) => w.weekly >= 5)
+      .sort((a, b) => b.weekly - a.weekly)
+      .slice(0, 3)
+      .map((w) => w.eventId),
+  );
 
   const events = rows.map((r) => ({
     id: r.id,

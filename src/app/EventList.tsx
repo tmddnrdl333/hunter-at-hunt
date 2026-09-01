@@ -92,6 +92,10 @@ function dayKey(iso: string): string {
   return `${weekday} · ${date}`;
 }
 
+/** 카드 우측의 작은 동작 버튼 (캘린더 추가 / 링크 복사) */
+const ACTION_PILL_CLASS =
+  'whitespace-nowrap rounded-full border border-stone-300 bg-white/70 px-2 py-0.5 text-xs text-stone-500 transition-all hover:border-red-700 hover:text-red-800 active:scale-90 dark:border-stone-600 dark:bg-stone-800/70 dark:text-stone-400 dark:hover:text-red-300';
+
 function chipClass(active: boolean): string {
   return `shrink-0 whitespace-nowrap rounded-lg border px-3 py-0.5 text-sm transition-all active:scale-95 ${
     active
@@ -487,14 +491,11 @@ export function EventList({
                       }}
                       aria-label="Add to Google Calendar"
                       title="Add to Google Calendar"
-                      className="rounded-md px-1 text-sm opacity-40 transition-opacity hover:opacity-100 active:scale-90"
+                      className={ACTION_PILL_CLASS}
                     >
-                      📅
+                      📅 Calendar
                     </button>
-                    <ShareButton
-                      path={`/event/${e.id}`}
-                      className="rounded-md px-1 text-sm opacity-40 transition-opacity hover:opacity-100 active:scale-90"
-                    />
+                    <ShareButton path={`/event/${e.id}`} className={ACTION_PILL_CLASS} />
                   </span>
                 </span>
               </a>
