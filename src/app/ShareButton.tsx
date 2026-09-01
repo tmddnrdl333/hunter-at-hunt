@@ -45,8 +45,18 @@ export function ShareButton({ path, className }: { path: string; className: stri
   };
 
   return (
-    <button onClick={share} aria-label="Copy event link" title="Copy link" className={className}>
-      {copied ? '✓ Copied' : '🔗 Share'}
-    </button>
+    <>
+      <button onClick={share} aria-label="Copy event link" title="Copy link" className={className}>
+        {copied ? '✓ Copied' : '🔗 Share'}
+      </button>
+      {copied && (
+        <span
+          role="status"
+          className="pointer-events-none fixed bottom-20 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-full bg-stone-900/95 px-4 py-2 text-sm font-medium text-white shadow-lg dark:bg-white/95 dark:text-stone-900"
+        >
+          🔗 Link copied to clipboard
+        </span>
+      )}
+    </>
   );
 }
