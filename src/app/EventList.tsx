@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { googleCalendarUrl } from '@/lib/calendar';
 import type { Category, Perk } from '@/lib/types';
+import { ShareButton } from './ShareButton';
 import { SignInModal } from './SignInModal';
 
 export interface EventItem {
@@ -20,6 +22,7 @@ export interface EventItem {
   source: string;
   viewCount: number;
   likeCount: number;
+  trending: boolean;
 }
 
 /** UI 필터/뱃지는 4종으로 단순화 — swag/prize/free_stuff는 Goodies로 묶음 */
@@ -124,6 +127,7 @@ export function EventList({
   const [perkFilter, setPerkFilter] = useState<PerkGroup | null>(null);
   const [whenFilter, setWhenFilter] = useState<WhenFilter>(null);
   const [catFilter, setCatFilter] = useState<Category | null>(null);
+  const [query, setQuery] = useState('');
   const [likedOnly, setLikedOnly] = useState(false);
   const [myLikes, setMyLikes] = useState<Set<number>>(() => new Set(initialLikes));
   /** 낙관적 카운트 보정: eventId → 누적 delta (서버 확정치 위에 항상 더해짐) */
@@ -147,6 +151,14 @@ export function EventList({
 
   const filtered = useMemo(() => {
     let list = events;
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter((e) =>
+        [e.title, e.summary, e.organizer, e.locationName]
+          .filter(Boolean)
+          .some((s) => s!.toLowerCase().includes(q)),
+      );
+    }
     if (perkFilter) {
       list = list.filter((e) => e.perks.some((p) => PERK_GROUP_OF[p] === perkFilter));
     }
@@ -162,12 +174,12 @@ export function EventList({
     if (catFilter) list = list.filter((e) => e.category === catFilter);
     if (likedOnly) list = list.filter((e) => myLikes.has(e.id));
     return list;
-  }, [events, perkFilter, whenFilter, catFilter, likedOnly, myLikes, todayKey, tomorrowKey, rangeFrom, rangeTo]);
+  }, [events, query, perkFilter, whenFilter, catFilter, likedOnly, myLikes, todayKey, tomorrowKey, rangeFrom, rangeTo]);
 
   // 필터가 바뀌면 무한스크롤 처음부터
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [perkFilter, whenFilter, catFilter, likedOnly, rangeFrom, rangeTo]);
+  }, [query, perkFilter, whenFilter, catFilter, likedOnly, rangeFrom, rangeTo]);
 
   // 무한 스크롤: 바닥 근처에 오면 다음 페이지 렌더
   totalRef.current = filtered.length;
@@ -265,6 +277,13 @@ export function EventList({
     <div>
       {/* 스크롤해도 상단에 붙는 필터바 */}
       <div className="sticky top-0 z-40 -mx-4 mb-2 space-y-2 border-b border-stone-200 bg-background/90 px-4 py-2.5 backdrop-blur dark:border-stone-800">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="🔍 Search events, places, clubs…"
+          className="w-full rounded-lg border border-stone-300 bg-white/70 px-3 py-1.5 text-sm placeholder:text-stone-400 focus:border-red-700 focus:outline-none dark:border-stone-600 dark:bg-stone-800/70"
+        />
         <FilterRow label="Freebies">
           {(Object.keys(PERK_GROUP_LABELS) as PerkGroup[]).map((p) => (
             <button
@@ -400,6 +419,14 @@ export function EventList({
                     <h3 className="font-semibold leading-snug group-hover:underline group-hover:decoration-red-800/50 group-hover:underline-offset-2">
                       {e.title}
                     </h3>
+                    {e.trending && (
+                      <span
+                        title="Popular with students"
+                        className="rounded-md bg-orange-500/15 px-1.5 py-0.5 text-xs font-medium text-orange-700 dark:text-orange-300"
+                      >
+                        🔥 Popular
+                      </span>
+                    )}
                     {badgeGroups.map((g) => (
                       <span
                         key={g}
@@ -428,28 +455,48 @@ export function EventList({
                     className="h-14 w-14 shrink-0 rounded-lg object-cover"
                   />
                 )}
-                {authEnabled && (
-                  <button
-                    onClick={(ev) => {
-                      ev.preventDefault();
-                      ev.stopPropagation();
-                      toggleLike(e.id);
-                    }}
-                    aria-label={myLikes.has(e.id) ? 'Unlike event' : 'Like event'}
-                    className={`flex shrink-0 items-center gap-1 self-start rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums transition-all active:scale-90 ${
-                      myLikes.has(e.id)
-                        ? 'border-red-800 bg-red-800 text-white'
-                        : 'border-stone-300 bg-white/70 text-stone-500 hover:border-red-700 hover:text-red-800 dark:border-stone-600 dark:bg-stone-800/70 dark:text-stone-400'
-                    }`}
-                  >
-                    👍{' '}
-                    {Math.max(
-                      0,
-                      (countOverride.get(e.id) ?? e.likeCount) +
-                        (likeDelta.get(e.id) ?? 0),
-                    )}
-                  </button>
-                )}
+                <span className="flex shrink-0 flex-col items-end gap-1 self-start">
+                  {authEnabled && (
+                    <button
+                      onClick={(ev) => {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        toggleLike(e.id);
+                      }}
+                      aria-label={myLikes.has(e.id) ? 'Unlike event' : 'Like event'}
+                      className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums transition-all active:scale-90 ${
+                        myLikes.has(e.id)
+                          ? 'border-red-800 bg-red-800 text-white'
+                          : 'border-stone-300 bg-white/70 text-stone-500 hover:border-red-700 hover:text-red-800 dark:border-stone-600 dark:bg-stone-800/70 dark:text-stone-400'
+                      }`}
+                    >
+                      👍{' '}
+                      {Math.max(
+                        0,
+                        (countOverride.get(e.id) ?? e.likeCount) +
+                          (likeDelta.get(e.id) ?? 0),
+                      )}
+                    </button>
+                  )}
+                  <span className="flex gap-1">
+                    <button
+                      onClick={(ev) => {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        window.open(googleCalendarUrl(e), '_blank', 'noopener');
+                      }}
+                      aria-label="Add to Google Calendar"
+                      title="Add to Google Calendar"
+                      className="rounded-md px-1 text-sm opacity-40 transition-opacity hover:opacity-100 active:scale-90"
+                    >
+                      📅
+                    </button>
+                    <ShareButton
+                      path={`/event/${e.id}`}
+                      className="rounded-md px-1 text-sm opacity-40 transition-opacity hover:opacity-100 active:scale-90"
+                    />
+                  </span>
+                </span>
               </a>
             </li>
           );
