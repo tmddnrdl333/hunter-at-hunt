@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Category, Perk } from '@/lib/types';
 import { EventActionsMenu } from './EventActionsMenu';
@@ -201,11 +202,6 @@ export function EventList({
 
   const visible = filtered.slice(0, visibleCount);
 
-  const countView = (id: number) => {
-    // fire-and-forget 조회수 집계
-    fetch(`/api/events/${id}/view`, { method: 'POST' }).catch(() => {});
-  };
-
   const applyLike = (id: number, liked: boolean) => {
     setMyLikes((prev) => {
       const next = new Set(prev);
@@ -400,11 +396,8 @@ export function EventList({
                   <span>{day.split(' · ')[1]}</span>
                 </h2>
               )}
-              <a
-                href={e.sourceUrl ?? '#'}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => countView(e.id)}
+              <Link
+                href={`/event/${e.id}`}
                 className={
                   hasFreebies
                     ? 'group mb-2 flex gap-3 rounded-xl border-l-4 border-red-800 bg-white p-3.5 shadow-sm transition-transform hover:translate-x-0.5 dark:bg-stone-800/80'
@@ -481,7 +474,7 @@ export function EventList({
                     </button>
                   )}
                 </span>
-              </a>
+              </Link>
             </li>
           );
         })}

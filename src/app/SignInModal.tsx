@@ -28,8 +28,11 @@ export function SignInModal({
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-sm rounded-xl bg-white p-6 text-center text-stone-800 shadow-xl dark:bg-stone-900 dark:text-stone-100"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/happy-wolf.png" alt="" className="mx-auto h-24 w-24" />
+        {/* 늑대 클릭 = 관리자 입구 (이스터에그) */}
+        <a href="/admin" aria-label="Admin">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/happy-wolf.png" alt="" className="mx-auto h-24 w-24" />
+        </a>
         <h2 className="font-display mt-1 text-lg font-bold">Join the hunt</h2>
         <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
           {message ?? 'Sign in to save events and get the most out of the hunt.'}
