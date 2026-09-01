@@ -1,18 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { useLockBodyScroll } from '@/lib/use-lock-scroll';
 
-/** 헤더 우상단 가이드 버튼 + 서비스 소개 팝업 */
-export function GuideButton() {
+/** 가이드 버튼 + 서비스 소개 팝업 (플로팅 독 안에서 사용) */
+export function GuideButton({ className }: { className: string }) {
   const [open, setOpen] = useState(false);
+  useLockBodyScroll(open);
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="How to use"
-        className="absolute right-3 top-3 rounded-full bg-black/30 px-3 py-1 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-black/50"
-      >
+      <button onClick={() => setOpen(true)} aria-label="How to use" className={className}>
         ? Guide
       </button>
 

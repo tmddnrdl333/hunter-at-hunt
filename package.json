@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.112.4",
     "@vercel/analytics": "^2.0.1",
     "drizzle-orm": "^0.45.2",
     "next": "16.3.3",

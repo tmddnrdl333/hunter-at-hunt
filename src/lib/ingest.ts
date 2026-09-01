@@ -3,7 +3,7 @@
  * 로컬 스크립트(scripts/ingest.ts)와 Vercel Cron route가 공용으로 호출한다.
  */
 import { createHash } from 'node:crypto';
-import { eq, lt } from 'drizzle-orm';
+import { eq, lt, sql } from 'drizzle-orm';
 import { db, schema } from './db';
 import { dedupe } from './dedupe';
 import { enrichWithLlm } from './llm';
@@ -171,14 +171,21 @@ export async function runIngest(opts: IngestOptions = {}): Promise<IngestResult>
     }
   }
 
-  // 6. 정리: 서빙 테이블은 지난 이벤트 즉시 제거,
+  // 6. 정리: 서빙 테이블은 끝난 이벤트 제거(종료 시각 기준, 없으면 시작 +2시간),
   //    로그(raw_events)는 이벤트 시작일 2일 경과분 삭제 (무한 누적 방지)
   const purgedRows = await db
     .delete(schema.events)
-    .where(lt(schema.events.startsAt, now))
+    .where(
+      sql`coalesce(${schema.events.endsAt}::timestamptz, ${schema.events.startsAt}::timestamptz + interval '2 hours') < now()`,
+    )
     .returning({ id: schema.events.id });
   const logCutoff = new Date(Date.now() - 2 * 86400_000).toISOString();
   await db.delete(schema.rawEvents).where(lt(schema.rawEvents.startsAt, logCutoff));
+  // 피드백 레이트리밋 기록도 24시간 경과분 정리 (윈도우는 1시간)
+  const feedbackCutoff = new Date(Date.now() - 86400_000).toISOString();
+  await db
+    .delete(schema.feedbackLog)
+    .where(lt(schema.feedbackLog.createdAt, feedbackCutoff));
 
   const total = await db.$count(schema.events);
   console.log(

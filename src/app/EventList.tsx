@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Category, Perk } from '@/lib/types';
+import { SignInModal } from './SignInModal';
 
 export interface EventItem {
   id: number;
@@ -18,6 +19,7 @@ export interface EventItem {
   sourceUrl: string | null;
   source: string;
   viewCount: number;
+  likeCount: number;
 }
 
 /** UI 필터/뱃지는 4종으로 단순화 — swag/prize/free_stuff는 Goodies로 묶음 */
@@ -107,10 +109,33 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
-export function EventList({ events }: { events: EventItem[] }) {
+export function EventList({
+  events,
+  authEnabled,
+  userSignedIn,
+  initialLikes,
+}: {
+  events: EventItem[];
+  /** Supabase Auth 설정 여부 — false면 좋아요 UI를 숨김 (데모 모드) */
+  authEnabled: boolean;
+  userSignedIn: boolean;
+  initialLikes: number[];
+}) {
   const [perkFilter, setPerkFilter] = useState<PerkGroup | null>(null);
   const [whenFilter, setWhenFilter] = useState<WhenFilter>(null);
   const [catFilter, setCatFilter] = useState<Category | null>(null);
+  const [likedOnly, setLikedOnly] = useState(false);
+  const [myLikes, setMyLikes] = useState<Set<number>>(() => new Set(initialLikes));
+  /** 낙관적 카운트 보정: eventId → 누적 delta (서버 확정치 위에 항상 더해짐) */
+  const [likeDelta, setLikeDelta] = useState<Map<number, number>>(new Map());
+  /** 서버가 응답으로 알려준 확정 카운트 — 초기 서버렌더 값(e.likeCount)을 대체하는 baseline */
+  const [countOverride, setCountOverride] = useState<Map<number, number>>(new Map());
+  /** 이벤트별 요청 시퀀스 — 연타 시 늦게 도착한 오래된 응답을 버리기 위함 */
+  const likeSeqRef = useRef<Map<number, number>>(new Map());
+  /** 서버가 확정해준 내 좋아요 상태 — 실패 롤백 시 미확정 낙관 상태가 아닌 이 값으로 복원 */
+  const confirmedLikedRef = useRef<Map<number, boolean>>(new Map());
+  const initialLikedRef = useRef<Set<number>>(new Set(initialLikes));
+  const [signInOpen, setSignInOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const totalRef = useRef(0);
   const todayKey = etDateKey(new Date());
@@ -135,13 +160,14 @@ export function EventList({ events }: { events: EventItem[] }) {
       });
     }
     if (catFilter) list = list.filter((e) => e.category === catFilter);
+    if (likedOnly) list = list.filter((e) => myLikes.has(e.id));
     return list;
-  }, [events, perkFilter, whenFilter, catFilter, todayKey, tomorrowKey, rangeFrom, rangeTo]);
+  }, [events, perkFilter, whenFilter, catFilter, likedOnly, myLikes, todayKey, tomorrowKey, rangeFrom, rangeTo]);
 
   // 필터가 바뀌면 무한스크롤 처음부터
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [perkFilter, whenFilter, catFilter, rangeFrom, rangeTo]);
+  }, [perkFilter, whenFilter, catFilter, likedOnly, rangeFrom, rangeTo]);
 
   // 무한 스크롤: 바닥 근처에 오면 다음 페이지 렌더
   totalRef.current = filtered.length;
@@ -167,6 +193,70 @@ export function EventList({ events }: { events: EventItem[] }) {
   const countView = (id: number) => {
     // fire-and-forget 조회수 집계
     fetch(`/api/events/${id}/view`, { method: 'POST' }).catch(() => {});
+  };
+
+  const applyLike = (id: number, liked: boolean) => {
+    setMyLikes((prev) => {
+      const next = new Set(prev);
+      if (liked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    setLikeDelta((prev) => {
+      const next = new Map(prev);
+      next.set(id, (next.get(id) ?? 0) + (liked ? 1 : -1));
+      return next;
+    });
+  };
+
+  const toggleLike = (id: number) => {
+    if (!userSignedIn) {
+      // 비로그인 상태에서 좋아요를 누르면 로그인 유도 (로그인 후 이 페이지로 복귀)
+      setSignInOpen(true);
+      return;
+    }
+    // 낙관적 업데이트 → 서버에 목표 상태 전송 → 최신 응답의 확정 카운트로 교정
+    const wasLiked = myLikes.has(id);
+    const wantLiked = !wasLiked;
+    applyLike(id, wantLiked);
+    const seq = (likeSeqRef.current.get(id) ?? 0) + 1;
+    likeSeqRef.current.set(id, seq);
+    fetch('/api/likes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eventId: id, liked: wantLiked }),
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        const data = (await r.json()) as { liked: boolean; likeCount: number };
+        // 이 응답보다 새 요청이 이미 나갔다면(연타) 오래된 응답은 무시
+        if (likeSeqRef.current.get(id) !== seq) return;
+        confirmedLikedRef.current.set(id, data.liked);
+        setCountOverride((prev) => new Map(prev).set(id, data.likeCount));
+        setLikeDelta((prev) => {
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
+      })
+      .catch(() => {
+        if (likeSeqRef.current.get(id) !== seq) return;
+        // 서버가 확정한 상태(없으면 초기 서버렌더 상태)로 복원 — delta도 함께 초기화해서
+        // 연속 실패 시 미확정 낙관 상태로 롤백되는 것을 방지
+        const confirmed =
+          confirmedLikedRef.current.get(id) ?? initialLikedRef.current.has(id);
+        setMyLikes((prev) => {
+          const next = new Set(prev);
+          if (confirmed) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+        setLikeDelta((prev) => {
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
+      });
   };
 
   let lastDay = '';
@@ -233,11 +323,30 @@ export function EventList({ events }: { events: EventItem[] }) {
               {CATEGORY_LABELS[c]}
             </button>
           ))}
+          {authEnabled && (
+            <button
+              onClick={() => {
+                if (!userSignedIn) {
+                  setSignInOpen(true);
+                  return;
+                }
+                setLikedOnly(!likedOnly);
+              }}
+              className={chipClass(likedOnly)}
+            >
+              👍 Liked
+            </button>
+          )}
           <span className="ml-auto shrink-0 pl-2 text-xs tabular-nums text-stone-400">
             {filtered.length} events
           </span>
         </FilterRow>
       </div>
+      <SignInModal
+        open={signInOpen}
+        onClose={() => setSignInOpen(false)}
+        message="Sign in to save events you don't want to miss."
+      />
 
       {filtered.length === 0 && (
         <div className="py-12 text-center">
@@ -318,6 +427,28 @@ export function EventList({ events }: { events: EventItem[] }) {
                     loading="lazy"
                     className="h-14 w-14 shrink-0 rounded-lg object-cover"
                   />
+                )}
+                {authEnabled && (
+                  <button
+                    onClick={(ev) => {
+                      ev.preventDefault();
+                      ev.stopPropagation();
+                      toggleLike(e.id);
+                    }}
+                    aria-label={myLikes.has(e.id) ? 'Unlike event' : 'Like event'}
+                    className={`flex shrink-0 items-center gap-1 self-start rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums transition-all active:scale-90 ${
+                      myLikes.has(e.id)
+                        ? 'border-red-800 bg-red-800 text-white'
+                        : 'border-stone-300 bg-white/70 text-stone-500 hover:border-red-700 hover:text-red-800 dark:border-stone-600 dark:bg-stone-800/70 dark:text-stone-400'
+                    }`}
+                  >
+                    👍{' '}
+                    {Math.max(
+                      0,
+                      (countOverride.get(e.id) ?? e.likeCount) +
+                        (likeDelta.get(e.id) ?? 0),
+                    )}
+                  </button>
                 )}
               </a>
             </li>

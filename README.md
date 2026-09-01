@@ -43,6 +43,11 @@ npm run db:push    # 스키마를 DB에 반영 (drizzle-kit)
 ```
 
 `.env.local`에 `DATABASE_URL`(Supabase transaction pooler), `GEMINI_API_KEY` 필요.
+로그인(Google OAuth, @ncsu.edu 전용)을 켜려면 `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`도 필요 — 없으면 로그인/좋아요 UI가 자동으로 숨겨진다.
+피드백 이메일 발송에는 `RESEND_API_KEY`, `FEEDBACK_TO`(수신 주소)가 필요하며
+미설정 시 발송만 비활성화(503)된다.
+`scripts/db-security.ts`가 RLS와 가입 도메인 제한 Auth Hook 함수를 설정한다.
 
 **데모 모드**: 둘 다 없어도 돌아간다 — `DATABASE_URL`이 없으면 로컬 파일 기반
 PGlite(내장 Postgres, `./data/pglite`)로 자동 전환되고, `GEMINI_API_KEY`가 없으면
