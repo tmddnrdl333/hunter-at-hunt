@@ -455,7 +455,12 @@ export function EventList({
                     className="h-14 w-14 shrink-0 rounded-lg object-cover"
                   />
                 )}
-                <span className="flex shrink-0 flex-col items-end gap-1 self-start">
+                {/* 우측 액션 컬럼: ⋮는 우상단, 👍는 우하단 */}
+                <span className="flex shrink-0 flex-col items-end justify-between gap-1 self-stretch">
+                  <EventActionsMenu
+                    calendarUrl={googleCalendarUrl(e)}
+                    sharePath={`/event/${e.id}`}
+                  />
                   {authEnabled && (
                     <button
                       onClick={(ev) => {
@@ -478,10 +483,6 @@ export function EventList({
                       )}
                     </button>
                   )}
-                  <EventActionsMenu
-                    calendarUrl={googleCalendarUrl(e)}
-                    sharePath={`/event/${e.id}`}
-                  />
                 </span>
               </a>
             </li>
