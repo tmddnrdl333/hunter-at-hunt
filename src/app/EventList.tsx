@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { googleCalendarUrl } from '@/lib/calendar';
 import type { Category, Perk } from '@/lib/types';
-import { ShareButton } from './ShareButton';
+import { EventActionsMenu } from './EventActionsMenu';
 import { SignInModal } from './SignInModal';
 
 export interface EventItem {
@@ -91,10 +91,6 @@ function dayKey(iso: string): string {
   });
   return `${weekday} · ${date}`;
 }
-
-/** 카드 우측의 작은 이모지 동작 버튼 (캘린더 추가 / 링크 복사) — 설명은 호버 툴팁으로 */
-const ACTION_BTN_CLASS =
-  'rounded-md px-1 text-base opacity-50 transition-all hover:opacity-100 active:scale-90';
 
 function chipClass(active: boolean): string {
   return `shrink-0 whitespace-nowrap rounded-lg border px-3 py-0.5 text-sm transition-all active:scale-95 ${
@@ -482,25 +478,10 @@ export function EventList({
                       )}
                     </button>
                   )}
-                  <span className="flex gap-0.5">
-                    <span className="group relative">
-                      <button
-                        onClick={(ev) => {
-                          ev.preventDefault();
-                          ev.stopPropagation();
-                          window.open(googleCalendarUrl(e), '_blank', 'noopener');
-                        }}
-                        aria-label="Add to Google Calendar"
-                        className={ACTION_BTN_CLASS}
-                      >
-                        📅
-                      </button>
-                      <span className="pointer-events-none absolute bottom-full right-0 z-30 mb-1 hidden whitespace-nowrap rounded-md bg-stone-900 px-2 py-1 text-xs text-white group-hover:block dark:bg-white dark:text-stone-900">
-                        Add to Google Calendar
-                      </span>
-                    </span>
-                    <ShareButton path={`/event/${e.id}`} className={ACTION_BTN_CLASS} />
-                  </span>
+                  <EventActionsMenu
+                    calendarUrl={googleCalendarUrl(e)}
+                    sharePath={`/event/${e.id}`}
+                  />
                 </span>
               </a>
             </li>
