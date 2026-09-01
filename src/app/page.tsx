@@ -72,17 +72,13 @@ export default async function Home({
 
   return (
     <>
-      {/* 넓은 화면의 양옆 밴드: 배너 자신을 블러로 깔아 어떤 가장자리 색이든 자연스럽게 이어지게 (letterbox blur) */}
-      <header className="relative overflow-hidden bg-[#a30404]">
-        <div
-          aria-hidden
-          className="absolute inset-0 scale-110 bg-[url(/banner.png)] bg-cover bg-center blur-xl"
-        />
+      {/* 양옆 밴드는 배너의 최빈색(배경 원단 레드 #b80000) 단색 */}
+      <header className="bg-[#b80000]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/banner.png"
           alt="Hunter at Hunt — Free food hunter at NC State"
-          className="relative mx-auto block h-auto w-full max-w-3xl"
+          className="mx-auto block h-auto w-full max-w-3xl"
         />
       </header>
       <FreshnessBanner />
