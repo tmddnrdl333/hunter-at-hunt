@@ -1,0 +1,28 @@
+/** Google Calendar "이벤트 추가" URL 생성 (NCSU는 구글 캠퍼스라 사실상 전원 커버) */
+export function googleCalendarUrl(e: {
+  title: string;
+  startsAt: string;
+  endsAt: string | null;
+  locationName: string | null;
+  summary: string | null;
+  sourceUrl: string | null;
+}): string {
+  const fmt = (iso: string) =>
+    new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const start = fmt(e.startsAt);
+  // 종료 시각이 없거나 시작보다 이르면(불량 데이터) 시작 +2시간 —
+  // 서빙 윈도우/purge가 가정하는 기본 지속시간(ingest.ts, page.tsx)과 일치
+  const validEnd =
+    e.endsAt && new Date(e.endsAt).getTime() > new Date(e.startsAt).getTime()
+      ? e.endsAt
+      : new Date(new Date(e.startsAt).getTime() + 2 * 3600_000).toISOString();
+  const end = fmt(validEnd);
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: e.title,
+    dates: `${start}/${end}`,
+    details: [e.summary, e.sourceUrl].filter(Boolean).join('\n\n'),
+    location: e.locationName ?? '',
+  });
+  return `https://calendar.google.com/calendar/render?${params}`;
+}

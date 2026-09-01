@@ -20,7 +20,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ auth_error?: string; auth?: string }>;
 }) {
-  const [rows, likeRows, user, params] = await Promise.all([
+  const [rows, likeRows, weeklyLikes, user, params] = await Promise.all([
     // 종료 시각까지 유지 (종료 시각이 없으면 시작 +2시간까지)
     db
       .select()
@@ -32,6 +32,12 @@ export default async function Home({
     db
       .select({ eventId: schema.likes.eventId, likeCount: count() })
       .from(schema.likes)
+      .groupBy(schema.likes.eventId),
+    // 🔥용 최근 7일 좋아요 — 시간 기준을 DB(now())에 둬서 렌더 순수성 유지
+    db
+      .select({ eventId: schema.likes.eventId, weekly: count() })
+      .from(schema.likes)
+      .where(sql`${schema.likes.createdAt}::timestamptz > now() - interval '7 days'`)
       .groupBy(schema.likes.eventId),
     getAuthedUser(),
     searchParams,
@@ -52,6 +58,18 @@ export default async function Home({
     ? (AUTH_ERROR_MESSAGES[params.auth_error] ?? AUTH_ERROR_MESSAGES.denied)
     : null;
 
+  // 🔥 인기: 최근 7일간 좋아요 5개 이상 중 상위 3개.
+  // 반드시 "지금 보이는(upcoming)" 이벤트로 한정 — 끝났지만 아직 purge 전인
+  // 이벤트가 상위 3칸을 차지해 뱃지가 통째로 사라지는 것을 방지
+  const upcomingIds = new Set(rows.map((r) => r.id));
+  const trendingIds = new Set(
+    weeklyLikes
+      .filter((w) => w.weekly >= 5 && upcomingIds.has(w.eventId))
+      .sort((a, b) => b.weekly - a.weekly)
+      .slice(0, 3)
+      .map((w) => w.eventId),
+  );
+
   const events = rows.map((r) => ({
     id: r.id,
     title: r.title,
@@ -68,7 +86,36 @@ export default async function Home({
     source: r.source,
     viewCount: r.viewCount,
     likeCount: likeCountMap.get(r.id) ?? 0,
+    trending: trendingIds.has(r.id),
   }));
+
+  // 오늘의 하이라이트: perks 태그 집계 (LLM 추가 호출 없음 — ingest 때 붙인 태그를 세기만 함)
+  const etKey = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const todayEt = etKey(new Date().toISOString());
+  const todayEvents = events.filter((e) => etKey(e.startsAt) === todayEt);
+  const todayFood = todayEvents.filter((e) => e.perks.includes('free_food')).length;
+  const todayFreebies = todayEvents.filter((e) => e.perks.length > 0).length;
+  let highlight: string | null = null;
+  if (todayFood > 0) {
+    const extra = todayFreebies - todayFood;
+    highlight = `🍕 Free food at ${todayFood} event${todayFood > 1 ? 's' : ''} today${
+      extra > 0 ? ` · ${extra} more freebie${extra > 1 ? 's' : ''}` : ''
+    }`;
+  } else if (todayFreebies > 0) {
+    highlight = `🎁 Freebies at ${todayFreebies} event${todayFreebies > 1 ? 's' : ''} today`;
+  } else {
+    const nextFood = events.find((e) => e.perks.includes('free_food'));
+    if (nextFood) {
+      const day = new Date(nextFood.startsAt).toLocaleDateString('en-US', {
+        timeZone: 'America/New_York',
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+      highlight = `🍕 Next free food: ${day} — ${nextFood.title}`;
+    }
+  }
 
   return (
     <>
@@ -84,6 +131,11 @@ export default async function Home({
       <FreshnessBanner />
       <main className="mx-auto max-w-3xl px-4 pb-24 pt-6">
         {authError && <AuthErrorModal message={authError} />}
+        {highlight && (
+          <p className="mb-3 rounded-lg bg-red-800/10 px-3 py-2 text-sm font-medium text-red-900 dark:bg-red-400/10 dark:text-red-200">
+            {highlight}
+          </p>
+        )}
         {(params.auth === 'signedin' || params.auth === 'signedout') && (
           <AuthToast kind={params.auth} email={user?.email} />
         )}
