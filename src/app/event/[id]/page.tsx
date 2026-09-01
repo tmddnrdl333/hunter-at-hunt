@@ -5,8 +5,9 @@ import { cache } from 'react';
 import { and, asc, count, eq, isNull, sql } from 'drizzle-orm';
 import { googleCalendarUrl } from '@/lib/calendar';
 import { db, schema } from '@/lib/db';
-import { getAuthedUser } from '@/lib/supabase/server';
+import { getAuthedUser, supabaseConfigured } from '@/lib/supabase/server';
 import type { Perk } from '@/lib/types';
+import { FloatingDock } from '@/app/FloatingDock';
 import { AttendanceWidget } from './AttendanceWidget';
 import { Comments, type CommentView } from './Comments';
 
@@ -61,12 +62,13 @@ export default async function EventPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const event = await getEvent((await params).id);
+  const [event, user] = await Promise.all([
+    getEvent((await params).id),
+    getAuthedUser(),
+  ]);
   if (!event) notFound();
 
-  const user = await getAuthedUser();
-
-  const [[{ likeCount }], commentRows, commentLikeRows, myCommentLikeRows, attRows, myAttRows] =
+  const [[{ likeCount }], commentRows, commentLikeRows, myCommentLikeRows, attAgg, myAttRows] =
     await Promise.all([
       db
         .select({ likeCount: count() })
@@ -86,7 +88,8 @@ export default async function EventPage({
         .from(schema.comments)
         .leftJoin(schema.authUsers, eq(schema.comments.userId, schema.authUsers.id))
         .where(and(eq(schema.comments.eventId, event.id), isNull(schema.comments.hiddenAt)))
-        .orderBy(asc(schema.comments.createdAt)),
+        .orderBy(asc(schema.comments.createdAt))
+        .limit(200),
       db
         .select({ commentId: schema.commentLikes.commentId, n: count() })
         .from(schema.commentLikes)
@@ -105,7 +108,15 @@ export default async function EventPage({
               ),
             )
         : Promise.resolve([]),
-      db.select().from(schema.attendance).where(eq(schema.attendance.eventId, event.id)),
+      // Field Report 집계는 SQL에서 (행 전체를 앱으로 끌어오지 않음)
+      db.execute(sql`
+        select count(*)::int as went,
+          mode() within group (order by crowd) filter (where crowd is not null) as top_crowd,
+          min(ran_out_at) filter (where food_ran_out and ran_out_at is not null) as ran_out_at,
+          coalesce(bool_or(food_ran_out), false) as any_ran_out,
+          coalesce(bool_or(not food_ran_out), false) as any_not_ran_out
+        from attendance where event_id = ${event.id}
+      `),
       user
         ? db
             .select({ userId: schema.attendance.userId })
@@ -126,44 +137,48 @@ export default async function EventPage({
 
   const likeCountByComment = new Map(commentLikeRows.map((r) => [r.commentId, r.n]));
   const myLikedComments = new Set(myCommentLikeRows.map((r) => r.commentId));
-  const comments: CommentView[] = commentRows.map((c) => ({
-    id: c.id,
-    parentId: c.parentId,
-    body: c.deletedAt ? '' : c.body,
-    createdAt: c.createdAt,
-    author: c.email?.split('@')[0] ?? 'hunter',
-    likeCount: likeCountByComment.get(c.id) ?? 0,
-    likedByMe: myLikedComments.has(c.id),
-    isMine: user?.id === c.userId,
-    deleted: !!c.deletedAt,
-  }));
+  // 부모가 숨김 처리된 답글은 렌더 불가 상태이므로 목록·카운트에서 함께 제외
+  const visibleIds = new Set(commentRows.map((c) => c.id));
+  const comments: CommentView[] = commentRows
+    .filter((c) => c.parentId === null || visibleIds.has(c.parentId))
+    .map((c) => ({
+      id: c.id,
+      parentId: c.parentId,
+      body: c.deletedAt ? '' : c.body,
+      createdAt: c.createdAt,
+      author: c.email?.split('@')[0] ?? 'hunter',
+      likeCount: likeCountByComment.get(c.id) ?? 0,
+      likedByMe: myLikedComments.has(c.id),
+      isMine: user?.id === c.userId,
+      deleted: !!c.deletedAt,
+    }));
 
-  // Field Report 집계 — 데이터가 하나라도 있을 때만 표시
-  const fmtClock = (t: string) => {
-    const [h, m] = t.split(':').map(Number);
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return t;
+  // Field Report — 데이터가 하나라도 있을 때만 표시. 형식 밖 값은 조용히 생략
+  const fmtClock = (t: string): string | null => {
+    const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(t);
+    if (!m) return null;
+    const h = Number(m[1]);
     const ampm = h >= 12 ? 'PM' : 'AM';
-    return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${ampm}`;
+    return `${((h + 11) % 12) + 1}:${m[2]} ${ampm}`;
   };
+  const CROWD_LABELS: Record<string, string> = {
+    quiet: '😌 quiet',
+    moderate: '🙂 moderate',
+    packed: '😵 packed',
+  };
+  const agg = (attAgg as unknown as Array<Record<string, unknown>>)[0] ?? {};
+  const went = Number(agg.went ?? 0);
   let fieldReport: string | null = null;
-  if (attRows.length > 0) {
-    const parts = [`🐺 ${attRows.length} hunter${attRows.length > 1 ? 's' : ''} went`];
-    const crowds = attRows.map((a) => a.crowd).filter(Boolean) as string[];
-    if (crowds.length > 0) {
-      const freq = new Map<string, number>();
-      for (const cr of crowds) freq.set(cr, (freq.get(cr) ?? 0) + 1);
-      const top = [...freq.entries()].sort((a, b) => b[1] - a[1])[0][0];
-      parts.push({ quiet: '😌 quiet', moderate: '🙂 moderate', packed: '😵 packed' }[top]!);
-    }
-    const ranOutTimes = attRows
-      .filter((a) => a.foodRanOut && a.ranOutAt)
-      .map((a) => a.ranOutAt!)
-      .sort();
-    if (ranOutTimes.length > 0) {
-      parts.push(`🍕 food ran out ~${fmtClock(ranOutTimes[0])}`);
-    } else if (attRows.some((a) => a.foodRanOut === true)) {
+  if (went > 0) {
+    const parts = [`🐺 ${went} hunter${went > 1 ? 's' : ''} went`];
+    const crowdLabel = CROWD_LABELS[String(agg.top_crowd ?? '')];
+    if (crowdLabel) parts.push(crowdLabel);
+    const ranOutClock = typeof agg.ran_out_at === 'string' ? fmtClock(agg.ran_out_at) : null;
+    if (ranOutClock) {
+      parts.push(`🍕 food ran out ~${ranOutClock}`);
+    } else if (agg.any_ran_out === true) {
       parts.push('🍕 food ran out');
-    } else if (attRows.some((a) => a.foodRanOut === false)) {
+    } else if (agg.any_not_ran_out === true) {
       parts.push('🍕 food was still available');
     }
     fieldReport = parts.join(' · ');
@@ -297,8 +312,9 @@ export default async function EventPage({
         eventId={event.id}
         signedIn={!!user}
         alreadyWent={myAttRows.length > 0}
-        started={new Date(event.startsAt).getTime() <= Date.now()}
+        startsAt={event.startsAt}
       />
+      <FloatingDock authEnabled={supabaseConfigured} userEmail={user?.email ?? null} />
     </main>
   );
 }

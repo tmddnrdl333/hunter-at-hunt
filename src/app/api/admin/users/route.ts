@@ -33,9 +33,24 @@ export async function POST(req: Request) {
       await db.delete(schema.bannedUsers).where(eq(schema.bannedUsers.userId, userId));
     } else {
       // 계정 삭제 — auth.users에서 제거 (세션/identity는 Supabase FK cascade).
-      // 작성 댓글은 남고 작성자는 'hunter'로 표시됨
-      await db.delete(schema.authUsers).where(eq(schema.authUsers.id, userId));
-      await db.delete(schema.bannedUsers).where(eq(schema.bannedUsers.userId, userId));
+      // 작성 댓글은 남고 작성자는 'hunter'로 표시됨. 그 외 개인 데이터는 정리.
+      const deleted = await db
+        .delete(schema.authUsers)
+        .where(eq(schema.authUsers.id, userId))
+        .returning({ id: schema.authUsers.id });
+      if (deleted.length === 0) {
+        // 권한/RLS 문제로 조용히 0행 삭제되는 케이스를 성공으로 위장하지 않음
+        return Response.json({ error: 'delete had no effect' }, { status: 502 });
+      }
+      await Promise.all([
+        db.delete(schema.likes).where(eq(schema.likes.userId, userId)),
+        db.delete(schema.attendance).where(eq(schema.attendance.userId, userId)),
+        db.delete(schema.commentLikes).where(eq(schema.commentLikes.userId, userId)),
+        db.delete(schema.commentReports).where(eq(schema.commentReports.userId, userId)),
+        db.delete(schema.feedbackLog).where(eq(schema.feedbackLog.userId, userId)),
+        db.delete(schema.commentRateLog).where(eq(schema.commentRateLog.userId, userId)),
+        db.delete(schema.bannedUsers).where(eq(schema.bannedUsers.userId, userId)),
+      ]);
     }
     return Response.json({ ok: true });
   } catch (err) {

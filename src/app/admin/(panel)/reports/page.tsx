@@ -1,41 +1,38 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { count, desc, eq } from 'drizzle-orm';
+import { isAdmin } from '@/lib/admin-auth';
 import { db, schema } from '@/lib/db';
 import { AdminAction } from '../../AdminAction';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminReports() {
-  // 신고가 1건이라도 있는 댓글을 신고 수 내림차순으로
-  const reported = await db
+  if (!(await isAdmin())) redirect('/admin/login');
+
+  // 신고가 1건이라도 있는 댓글을 신고 수 내림차순으로 — 단일 쿼리 (N+1 방지)
+  const items = await db
     .select({
-      commentId: schema.commentReports.commentId,
-      reports: count(),
+      id: schema.comments.id,
+      body: schema.comments.body,
+      createdAt: schema.comments.createdAt,
+      hiddenAt: schema.comments.hiddenAt,
+      eventId: schema.comments.eventId,
+      email: schema.authUsers.email,
+      eventTitle: schema.events.title,
+      reports: count(schema.commentReports.userId),
     })
     .from(schema.commentReports)
-    .groupBy(schema.commentReports.commentId)
-    .orderBy(desc(count()));
-
-  const rows = await Promise.all(
-    reported.map(async (r) => {
-      const [row] = await db
-        .select({
-          id: schema.comments.id,
-          body: schema.comments.body,
-          createdAt: schema.comments.createdAt,
-          hiddenAt: schema.comments.hiddenAt,
-          eventId: schema.comments.eventId,
-          email: schema.authUsers.email,
-          eventTitle: schema.events.title,
-        })
-        .from(schema.comments)
-        .leftJoin(schema.authUsers, eq(schema.comments.userId, schema.authUsers.id))
-        .leftJoin(schema.events, eq(schema.comments.eventId, schema.events.id))
-        .where(eq(schema.comments.id, r.commentId));
-      return row ? { ...row, reports: r.reports } : null;
-    }),
-  );
-  const items = rows.filter(Boolean) as NonNullable<(typeof rows)[number]>[];
+    .innerJoin(schema.comments, eq(schema.commentReports.commentId, schema.comments.id))
+    .leftJoin(schema.authUsers, eq(schema.comments.userId, schema.authUsers.id))
+    .leftJoin(schema.events, eq(schema.comments.eventId, schema.events.id))
+    .groupBy(
+      schema.comments.id,
+      schema.authUsers.email,
+      schema.events.title,
+    )
+    .orderBy(desc(count(schema.commentReports.userId)))
+    .limit(100);
 
   return (
     <div>

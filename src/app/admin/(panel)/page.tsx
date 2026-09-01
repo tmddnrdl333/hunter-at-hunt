@@ -1,10 +1,13 @@
+import { redirect } from 'next/navigation';
 import { count, desc, eq, isNotNull, max } from 'drizzle-orm';
+import { isAdmin } from '@/lib/admin-auth';
 import { db, schema } from '@/lib/db';
 import { AdminAction } from '../AdminAction';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminDashboard() {
+  if (!(await isAdmin())) redirect('/admin/login');
   const [
     [{ users }],
     [{ events }],

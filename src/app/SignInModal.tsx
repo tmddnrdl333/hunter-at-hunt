@@ -28,8 +28,8 @@ export function SignInModal({
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-sm rounded-xl bg-white p-6 text-center text-stone-800 shadow-xl dark:bg-stone-900 dark:text-stone-100"
       >
-        {/* 늑대 클릭 = 관리자 입구 (이스터에그) */}
-        <a href="/admin" aria-label="Admin">
+        {/* 늑대 클릭 = 관리자 입구 (이스터에그 — 접근성 트리에는 숨김, 방어는 레이트리밋이 담당) */}
+        <a href="/admin" aria-hidden tabIndex={-1}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/happy-wolf.png" alt="" className="mx-auto h-24 w-24" />
         </a>

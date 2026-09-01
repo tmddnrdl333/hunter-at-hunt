@@ -1,10 +1,14 @@
-import { count, eq } from 'drizzle-orm';
+import { redirect } from 'next/navigation';
+import { count, desc, eq } from 'drizzle-orm';
+import { isAdmin } from '@/lib/admin-auth';
 import { db, schema } from '@/lib/db';
 import { AdminAction } from '../../AdminAction';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminUsers() {
+  if (!(await isAdmin())) redirect('/admin/login');
+
   const [users, commentCounts, likeGiven, likesReceived, reportsReceived, banned] =
     await Promise.all([
       db
@@ -13,7 +17,9 @@ export default async function AdminUsers() {
           email: schema.authUsers.email,
           createdAt: schema.authUsers.createdAt,
         })
-        .from(schema.authUsers),
+        .from(schema.authUsers)
+        .orderBy(desc(schema.authUsers.createdAt))
+        .limit(500),
       db
         .select({ userId: schema.comments.userId, n: count() })
         .from(schema.comments)

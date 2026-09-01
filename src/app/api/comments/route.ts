@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt } from 'drizzle-orm';
+import { and, count, desc, eq, gt, sql } from 'drizzle-orm';
 import { db, schema } from '@/lib/db';
 import { getAuthedUser } from '@/lib/supabase/server';
 
@@ -49,26 +49,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    // 레이트리밋: 마지막 댓글 30초 경과 + 24시간 50개 미만
-    const [last] = await db
-      .select({ createdAt: schema.comments.createdAt })
-      .from(schema.comments)
-      .where(eq(schema.comments.userId, user.id))
-      .orderBy(desc(schema.comments.createdAt))
-      .limit(1);
-    if (last && Date.now() - new Date(last.createdAt).getTime() < MIN_INTERVAL_MS) {
-      return Response.json({ error: 'too fast' }, { status: 429 });
-    }
-    const dayAgo = new Date(Date.now() - 86400_000).toISOString();
-    const [{ recent }] = await db
-      .select({ recent: count() })
-      .from(schema.comments)
-      .where(and(eq(schema.comments.userId, user.id), gt(schema.comments.createdAt, dayAgo)));
-    if (recent >= DAILY_LIMIT) {
-      return Response.json({ error: 'daily limit' }, { status: 429 });
-    }
-
-    // 대댓글은 2뎁스까지만: 부모는 같은 이벤트의 최상위 댓글이어야 함
+    // 대댓글은 2뎁스까지만: 부모는 같은 이벤트의, 삭제/숨김되지 않은 최상위 댓글이어야 함
     if (parentId != null) {
       const [parent] = await db
         .select({
@@ -76,25 +57,62 @@ export async function POST(req: Request) {
           eventId: schema.comments.eventId,
           parentId: schema.comments.parentId,
           deletedAt: schema.comments.deletedAt,
+          hiddenAt: schema.comments.hiddenAt,
         })
         .from(schema.comments)
         .where(eq(schema.comments.id, parentId));
-      if (!parent || parent.eventId !== eventId || parent.parentId !== null) {
+      if (
+        !parent ||
+        parent.eventId !== eventId ||
+        parent.parentId !== null ||
+        parent.deletedAt !== null ||
+        parent.hiddenAt !== null
+      ) {
         return Response.json({ error: 'invalid parent' }, { status: 400 });
       }
     }
 
-    const [created] = await db
-      .insert(schema.comments)
-      .values({
-        eventId,
-        userId: user.id,
-        parentId,
-        body,
-        createdAt: new Date().toISOString(),
-      })
-      .returning({ id: schema.comments.id });
-    return Response.json({ ok: true, id: created.id });
+    // 레이트리밋: 트랜잭션 + 사용자별 advisory lock으로 병렬 요청 직렬화(check-then-act 경쟁 차단),
+    // 기록은 댓글 삭제와 무관한 comment_rate_log 기준(삭제로 리셋 불가)
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${user.id}))`);
+
+      const [last] = await tx
+        .select({ createdAt: schema.commentRateLog.createdAt })
+        .from(schema.commentRateLog)
+        .where(eq(schema.commentRateLog.userId, user.id))
+        .orderBy(desc(schema.commentRateLog.createdAt))
+        .limit(1);
+      if (last && Date.now() - new Date(last.createdAt).getTime() < MIN_INTERVAL_MS) {
+        return { rateLimited: true as const };
+      }
+      const dayAgo = new Date(Date.now() - 86400_000).toISOString();
+      const [{ recent }] = await tx
+        .select({ recent: count() })
+        .from(schema.commentRateLog)
+        .where(
+          and(
+            eq(schema.commentRateLog.userId, user.id),
+            gt(schema.commentRateLog.createdAt, dayAgo),
+          ),
+        );
+      if (recent >= DAILY_LIMIT) {
+        return { rateLimited: true as const };
+      }
+
+      const now = new Date().toISOString();
+      await tx.insert(schema.commentRateLog).values({ userId: user.id, createdAt: now });
+      const [created] = await tx
+        .insert(schema.comments)
+        .values({ eventId, userId: user.id, parentId, body, createdAt: now })
+        .returning({ id: schema.comments.id });
+      return { rateLimited: false as const, id: created.id };
+    });
+
+    if (result.rateLimited) {
+      return Response.json({ error: 'rate limited' }, { status: 429 });
+    }
+    return Response.json({ ok: true, id: result.id });
   } catch (err) {
     if (err && typeof err === 'object' && 'code' in err && err.code === '23503') {
       return Response.json({ error: 'event not found' }, { status: 404 });

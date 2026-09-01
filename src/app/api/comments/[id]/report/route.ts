@@ -22,6 +22,18 @@ export async function POST(
     return Response.json({ error: 'invalid id' }, { status: 400 });
   }
   try {
+    // 자기 댓글은 신고 불가 (자동숨김 3인 중 1인이 작성자 본인이 되는 것 방지)
+    const [target] = await db
+      .select({ userId: schema.comments.userId })
+      .from(schema.comments)
+      .where(eq(schema.comments.id, id));
+    if (!target) {
+      return Response.json({ error: 'comment not found' }, { status: 404 });
+    }
+    if (target.userId === user.id) {
+      return Response.json({ error: 'cannot report own comment' }, { status: 400 });
+    }
+
     await db
       .insert(schema.commentReports)
       .values({ userId: user.id, commentId: id, createdAt: new Date().toISOString() })

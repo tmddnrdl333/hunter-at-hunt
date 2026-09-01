@@ -140,14 +140,26 @@ function CommentItem({
   const report = async () => {
     if (!signedIn) return requireSignIn();
     if (!window.confirm('Report this comment?')) return;
-    await fetch(`/api/comments/${comment.id}/report`, { method: 'POST' }).catch(() => {});
+    const res = await fetch(`/api/comments/${comment.id}/report`, { method: 'POST' }).catch(
+      () => null,
+    );
+    if (!res?.ok) {
+      window.alert('Failed to report. Please try again.');
+      return;
+    }
     setReported(true);
     router.refresh();
   };
 
   const remove = async () => {
     if (!window.confirm('Delete this comment?')) return;
-    await fetch(`/api/comments/${comment.id}`, { method: 'DELETE' }).catch(() => {});
+    const res = await fetch(`/api/comments/${comment.id}`, { method: 'DELETE' }).catch(
+      () => null,
+    );
+    if (!res?.ok) {
+      window.alert('Failed to delete. Please try again.');
+      return;
+    }
     router.refresh();
   };
 

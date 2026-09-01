@@ -22,18 +22,19 @@ export function AttendanceWidget({
   eventId,
   signedIn,
   alreadyWent,
-  started,
+  startsAt,
 }: {
   eventId: number;
   signedIn: boolean;
   alreadyWent: boolean;
-  /** 아직 시작 전인 이벤트에는 "I went" 대신 Going만 물어봄 */
-  started: boolean;
+  startsAt: string;
 }) {
   const router = useRouter();
-  const [phase, setPhase] = useState<'button' | 'ask' | 'survey' | 'done' | 'closed'>(
+  const [phase, setPhase] = useState<'button' | 'ask' | 'survey' | 'done' | 'error' | 'closed'>(
     alreadyWent ? 'closed' : 'button',
   );
+  /** 아직 시작 전인 이벤트에는 "I went" 대신 Going만 물어봄 (마운트 시점 기준) */
+  const [started] = useState(() => new Date(startsAt).getTime() <= Date.now());
   const [signInOpen, setSignInOpen] = useState(false);
   const [visitedAt, setVisitedAt] = useState('');
   const [crowd, setCrowd] = useState<string | null>(null);
@@ -41,37 +42,46 @@ export function AttendanceWidget({
   const [ranOutAt, setRanOutAt] = useState('');
   const [sending, setSending] = useState(false);
 
-  if (phase === 'closed') return null;
-
   const requireSignIn = () => setSignInOpen(true);
+
+  const finish = (ok: boolean) => {
+    if (ok) {
+      setPhase('done');
+      setTimeout(() => setPhase('closed'), 1800);
+      router.refresh();
+    } else {
+      setPhase('error');
+    }
+  };
 
   const going = async () => {
     if (!signedIn) return requireSignIn();
-    await fetch('/api/likes', {
+    const res = await fetch('/api/likes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId, liked: true }),
-    }).catch(() => {});
-    setPhase('done');
-    setTimeout(() => setPhase('closed'), 1800);
-    router.refresh();
+    }).catch(() => null);
+    finish(!!res?.ok);
   };
 
   const submitSurvey = async () => {
     if (sending) return;
     setSending(true);
-    await fetch('/api/attendance', {
+    const res = await fetch('/api/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ eventId, visitedAt, crowd, foodRanOut, ranOutAt }),
-    }).catch(() => {});
+    }).catch(() => null);
     setSending(false);
-    setPhase('done');
-    setTimeout(() => setPhase('closed'), 1800);
-    router.refresh();
+    finish(!!res?.ok);
   };
 
+  if (phase === 'closed') {
+    return <SignInModal open={signInOpen} onClose={() => setSignInOpen(false)} />;
+  }
+
   return (
+    <>
     <div className="fixed bottom-4 right-4 z-40">
       {phase === 'button' && (
         <button
@@ -178,13 +188,26 @@ export function AttendanceWidget({
           {phase === 'done' && (
             <p className="text-center text-sm font-semibold">Thanks, hunter! 🐺</p>
           )}
+          {phase === 'error' && (
+            <div className="text-center">
+              <p className="text-sm font-semibold text-red-700">Something went wrong.</p>
+              <button
+                onClick={() => setPhase('ask')}
+                className="mt-2 text-sm text-stone-400 underline hover:text-stone-600"
+              >
+                Try again
+              </button>
+            </div>
+          )}
         </div>
       )}
-      <SignInModal
-        open={signInOpen}
-        onClose={() => setSignInOpen(false)}
-        message="Sign in to log your hunt."
-      />
     </div>
+    {/* 모달은 z-40 컨테이너 밖에서 렌더 — 스태킹 컨텍스트에 갇히지 않게 */}
+    <SignInModal
+      open={signInOpen}
+      onClose={() => setSignInOpen(false)}
+      message="Sign in to log your hunt."
+    />
+    </>
   );
 }

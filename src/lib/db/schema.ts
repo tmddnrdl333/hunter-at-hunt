@@ -161,6 +161,28 @@ export const bannedUsers = pgTable('banned_users', {
   createdAt: text('created_at').notNull(),
 });
 
+/** 관리자 로그인 실패 기록 — IP 기준 브루트포스 잠금용 */
+export const adminLoginAttempts = pgTable(
+  'admin_login_attempts',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    ip: text('ip').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('admin_attempts_ip_idx').on(t.ip, t.createdAt)],
+);
+
+/** 댓글 작성 시도 기록 — 댓글 삭제와 무관하게 유지되는 레이트리밋 근거 */
+export const commentRateLog = pgTable(
+  'comment_rate_log',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    userId: uuid('user_id').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('comment_rate_user_idx').on(t.userId, t.createdAt)],
+);
+
 export const rawEvents = pgTable('raw_events', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
   runAt: text('run_at').notNull(),
