@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { count, eq } from 'drizzle-orm';
+import { cache } from 'react';
+import { count, eq, sql } from 'drizzle-orm';
 import { googleCalendarUrl } from '@/lib/calendar';
 import { db, schema } from '@/lib/db';
 import type { Perk } from '@/lib/types';
@@ -19,15 +20,25 @@ const PERK_LABELS: Record<Perk, string> = {
   free_stuff: '✨ Free Stuff',
 };
 
-async function getEvent(idParam: string) {
+const MAX_INT4 = 2147483647;
+
+// React cache: generateMetadata와 페이지 본문이 같은 요청에서 중복 조회하지 않게
+const getEvent = cache(async (idParam: string) => {
+  // 정규 형식(십진 숫자만)과 int4 범위를 검증 — /event/1e3, 초과값 등은 404로
+  if (!/^\d{1,10}$/.test(idParam)) return null;
   const id = Number(idParam);
-  if (!Number.isSafeInteger(id) || id <= 0) return null;
-  const [event] = await db
-    .select()
-    .from(schema.events)
-    .where(eq(schema.events.id, id));
-  return event ?? null;
-}
+  if (id <= 0 || id > MAX_INT4) return null;
+  try {
+    const [event] = await db
+      .select()
+      .from(schema.events)
+      .where(eq(schema.events.id, id));
+    return event ?? null;
+  } catch (err) {
+    console.error('[event page] query error:', err);
+    return null;
+  }
+});
 
 export async function generateMetadata({
   params,
@@ -38,8 +49,7 @@ export async function generateMetadata({
   if (!event) return { title: 'Event not found — Hunter at Hunt' };
   return {
     title: `${event.title} — Hunter at Hunt`,
-    description:
-      event.summary ?? event.descriptionText?.slice(0, 160) ?? 'NC State campus event',
+    description: (event.summary || event.descriptionText || 'NC State campus event').slice(0, 160),
   };
 }
 
@@ -51,10 +61,17 @@ export default async function EventPage({
   const event = await getEvent((await params).id);
   if (!event) notFound();
 
-  const [{ likeCount }] = await db
-    .select({ likeCount: count() })
-    .from(schema.likes)
-    .where(eq(schema.likes.eventId, event.id));
+  const [[{ likeCount }]] = await Promise.all([
+    db
+      .select({ likeCount: count() })
+      .from(schema.likes)
+      .where(eq(schema.likes.eventId, event.id)),
+    // 공유 링크 유입도 조회수에 집계 (카드 클릭과 동일 지표)
+    db
+      .update(schema.events)
+      .set({ viewCount: sql`${schema.events.viewCount} + 1` })
+      .where(eq(schema.events.id, event.id)),
+  ]);
 
   const when = new Date(event.startsAt).toLocaleString('en-US', {
     timeZone: TZ,
@@ -64,12 +81,23 @@ export default async function EventPage({
     hour: 'numeric',
     minute: '2-digit',
   });
+  // 자정을 넘기는 이벤트는 종료 쪽에도 날짜를 표기
+  const etDay = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ });
   const until = event.endsAt
-    ? new Date(event.endsAt).toLocaleTimeString('en-US', {
-        timeZone: TZ,
-        hour: 'numeric',
-        minute: '2-digit',
-      })
+    ? new Date(event.endsAt).toLocaleString(
+        'en-US',
+        etDay(event.endsAt) === etDay(event.startsAt)
+          ? { timeZone: TZ, hour: 'numeric', minute: '2-digit' }
+          : {
+              timeZone: TZ,
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            },
+      )
     : null;
 
   return (

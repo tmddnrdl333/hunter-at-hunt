@@ -1,4 +1,4 @@
-import { asc, count, eq, gt, sql } from 'drizzle-orm';
+import { asc, count, eq, sql } from 'drizzle-orm';
 import { db, schema } from '@/lib/db';
 import { getAuthedUser, supabaseConfigured } from '@/lib/supabase/server';
 import { AuthErrorModal } from './AuthErrorModal';
@@ -20,7 +20,7 @@ export default async function Home({
 }: {
   searchParams: Promise<{ auth_error?: string; auth?: string }>;
 }) {
-  const [rows, likeRows, user, params] = await Promise.all([
+  const [rows, likeRows, weeklyLikes, user, params] = await Promise.all([
     // 종료 시각까지 유지 (종료 시각이 없으면 시작 +2시간까지)
     db
       .select()
@@ -32,6 +32,12 @@ export default async function Home({
     db
       .select({ eventId: schema.likes.eventId, likeCount: count() })
       .from(schema.likes)
+      .groupBy(schema.likes.eventId),
+    // 🔥용 최근 7일 좋아요 — 시간 기준을 DB(now())에 둬서 렌더 순수성 유지
+    db
+      .select({ eventId: schema.likes.eventId, weekly: count() })
+      .from(schema.likes)
+      .where(sql`${schema.likes.createdAt}::timestamptz > now() - interval '7 days'`)
       .groupBy(schema.likes.eventId),
     getAuthedUser(),
     searchParams,
@@ -52,16 +58,13 @@ export default async function Home({
     ? (AUTH_ERROR_MESSAGES[params.auth_error] ?? AUTH_ERROR_MESSAGES.denied)
     : null;
 
-  // 🔥 인기: 최근 7일간 받은 좋아요가 5개 이상인 것 중 상위 3개
-  const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
-  const weeklyLikes = await db
-    .select({ eventId: schema.likes.eventId, weekly: count() })
-    .from(schema.likes)
-    .where(gt(schema.likes.createdAt, weekAgo))
-    .groupBy(schema.likes.eventId);
+  // 🔥 인기: 최근 7일간 좋아요 5개 이상 중 상위 3개.
+  // 반드시 "지금 보이는(upcoming)" 이벤트로 한정 — 끝났지만 아직 purge 전인
+  // 이벤트가 상위 3칸을 차지해 뱃지가 통째로 사라지는 것을 방지
+  const upcomingIds = new Set(rows.map((r) => r.id));
   const trendingIds = new Set(
     weeklyLikes
-      .filter((w) => w.weekly >= 5)
+      .filter((w) => w.weekly >= 5 && upcomingIds.has(w.eventId))
       .sort((a, b) => b.weekly - a.weekly)
       .slice(0, 3)
       .map((w) => w.eventId),

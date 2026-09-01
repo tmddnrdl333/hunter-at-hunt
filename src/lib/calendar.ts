@@ -10,9 +10,13 @@ export function googleCalendarUrl(e: {
   const fmt = (iso: string) =>
     new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const start = fmt(e.startsAt);
-  const end = fmt(
-    e.endsAt ?? new Date(new Date(e.startsAt).getTime() + 3600_000).toISOString(),
-  );
+  // 종료 시각이 없거나 시작보다 이르면(불량 데이터) 시작 +2시간 —
+  // 서빙 윈도우/purge가 가정하는 기본 지속시간(ingest.ts, page.tsx)과 일치
+  const validEnd =
+    e.endsAt && new Date(e.endsAt).getTime() > new Date(e.startsAt).getTime()
+      ? e.endsAt
+      : new Date(new Date(e.startsAt).getTime() + 2 * 3600_000).toISOString();
+  const end = fmt(validEnd);
   const params = new URLSearchParams({
     action: 'TEMPLATE',
     text: e.title,

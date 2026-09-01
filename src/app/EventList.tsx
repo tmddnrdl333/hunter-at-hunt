@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { googleCalendarUrl } from '@/lib/calendar';
 import type { Category, Perk } from '@/lib/types';
 import { EventActionsMenu } from './EventActionsMenu';
 import { SignInModal } from './SignInModal';
@@ -279,6 +278,7 @@ export function EventList({
       <div className="sticky top-0 z-40 -mx-4 mb-2 space-y-2 border-b border-stone-200 bg-background/90 px-4 py-2.5 backdrop-blur dark:border-stone-800">
         <input
           type="search"
+          aria-label="Search events"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="🔍 Search events, places, clubs…"
@@ -457,10 +457,7 @@ export function EventList({
                 )}
                 {/* 우측 액션 컬럼: ⋮는 우상단, 👍는 우하단 */}
                 <span className="flex shrink-0 flex-col items-end justify-between gap-1 self-stretch">
-                  <EventActionsMenu
-                    calendarUrl={googleCalendarUrl(e)}
-                    sharePath={`/event/${e.id}`}
-                  />
+                  <EventActionsMenu event={e} />
                   {authEnabled && (
                     <button
                       onClick={(ev) => {
