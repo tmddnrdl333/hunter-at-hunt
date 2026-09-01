@@ -47,6 +47,9 @@ npm run db:push    # 스키마를 DB에 반영 (drizzle-kit)
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`도 필요 — 없으면 로그인/좋아요 UI가 자동으로 숨겨진다.
 피드백 이메일 발송에는 `RESEND_API_KEY`, `FEEDBACK_TO`(수신 주소)가 필요하며
 미설정 시 발송만 비활성화(503)된다.
+관리자 페이지(`/admin`)는 `ADMIN_ID`, `ADMIN_PASSWORD_HASH`(생성:
+`npx tsx scripts/hash-admin-password.ts`), `ADMIN_SESSION_SECRET`(32자 이상)이
+전부 설정되어야 활성화된다 — 미설정 시 로그인 페이지로만 리다이렉트된다.
 `scripts/db-security.ts`가 RLS와 가입 도메인 제한 Auth Hook 함수를 설정한다.
 
 **데모 모드**: 둘 다 없어도 돌아간다 — `DATABASE_URL`이 없으면 로컬 파일 기반

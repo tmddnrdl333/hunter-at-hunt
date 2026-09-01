@@ -34,7 +34,7 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // 정적 자원, cron, 조회수 집계(세션 불필요·호출 빈번)는 제외
-    '/((?!_next/static|_next/image|api/cron|api/events|.*\\.(?:png|jpg|jpeg|svg|ico|webp)$).*)',
+    // 정적 자원과 cron 엔드포인트는 제외
+    '/((?!_next/static|_next/image|api/cron|.*\\.(?:png|jpg|jpeg|svg|ico|webp)$).*)',
   ],
 };
