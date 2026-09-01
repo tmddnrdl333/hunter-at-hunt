@@ -132,6 +132,9 @@ export function EventList({
   const [countOverride, setCountOverride] = useState<Map<number, number>>(new Map());
   /** 이벤트별 요청 시퀀스 — 연타 시 늦게 도착한 오래된 응답을 버리기 위함 */
   const likeSeqRef = useRef<Map<number, number>>(new Map());
+  /** 서버가 확정해준 내 좋아요 상태 — 실패 롤백 시 미확정 낙관 상태가 아닌 이 값으로 복원 */
+  const confirmedLikedRef = useRef<Map<number, boolean>>(new Map());
+  const initialLikedRef = useRef<Set<number>>(new Set(initialLikes));
   const [signInOpen, setSignInOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const totalRef = useRef(0);
@@ -228,6 +231,7 @@ export function EventList({
         const data = (await r.json()) as { liked: boolean; likeCount: number };
         // 이 응답보다 새 요청이 이미 나갔다면(연타) 오래된 응답은 무시
         if (likeSeqRef.current.get(id) !== seq) return;
+        confirmedLikedRef.current.set(id, data.liked);
         setCountOverride((prev) => new Map(prev).set(id, data.likeCount));
         setLikeDelta((prev) => {
           const next = new Map(prev);
@@ -237,7 +241,21 @@ export function EventList({
       })
       .catch(() => {
         if (likeSeqRef.current.get(id) !== seq) return;
-        applyLike(id, wasLiked);
+        // 서버가 확정한 상태(없으면 초기 서버렌더 상태)로 복원 — delta도 함께 초기화해서
+        // 연속 실패 시 미확정 낙관 상태로 롤백되는 것을 방지
+        const confirmed =
+          confirmedLikedRef.current.get(id) ?? initialLikedRef.current.has(id);
+        setMyLikes((prev) => {
+          const next = new Set(prev);
+          if (confirmed) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+        setLikeDelta((prev) => {
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
       });
   };
 

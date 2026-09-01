@@ -52,7 +52,10 @@ export async function POST(req: Request) {
       .where(eq(schema.likes.eventId, eventId));
     return Response.json({ liked: body.liked, likeCount });
   } catch (err) {
-    // FK 위반(없는 이벤트) 포함 — 상세는 서버 로그에만
+    // FK 위반 = 존재하지 않는 이벤트 → 클라이언트 오류(404)로 분리
+    if (err && typeof err === 'object' && 'code' in err && err.code === '23503') {
+      return Response.json({ error: 'event not found' }, { status: 404 });
+    }
     console.error('[likes] error:', err);
     return Response.json({ error: 'internal' }, { status: 502 });
   }

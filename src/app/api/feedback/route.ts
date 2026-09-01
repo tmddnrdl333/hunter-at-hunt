@@ -51,6 +51,12 @@ export async function POST(req: Request) {
       return Response.json({ error: 'rate limited' }, { status: 429 });
     }
 
+    // 발송 "시도" 시점에 기록 — 실패가 반복돼도 외부 API 호출량 자체가 제한되도록
+    await db.insert(schema.feedbackLog).values({
+      userId: user.id,
+      createdAt: new Date().toISOString(),
+    });
+
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -73,11 +79,6 @@ export async function POST(req: Request) {
       console.error('[feedback] resend error:', res.status, (await res.text()).slice(0, 200));
       return Response.json({ error: 'send failed' }, { status: 502 });
     }
-
-    await db.insert(schema.feedbackLog).values({
-      userId: user.id,
-      createdAt: new Date().toISOString(),
-    });
     return Response.json({ ok: true });
   } catch (err) {
     // Resend 타임아웃/DB 순단 포함 — 상세는 서버 로그에만

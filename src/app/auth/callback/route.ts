@@ -22,9 +22,9 @@ export async function GET(request: Request) {
 
   if (!code) {
     // 사용자가 구글 화면에서 취소한 경우 등 (?error=access_denied)
-    const provider_error = searchParams.get('error');
+    const providerError = searchParams.get('error');
     return NextResponse.redirect(
-      `${origin}/?auth_error=${provider_error ? 'denied' : 'missing_code'}`,
+      `${origin}/?auth_error=${providerError ? 'denied' : 'missing_code'}`,
     );
   }
 

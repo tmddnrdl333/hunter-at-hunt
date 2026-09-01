@@ -181,6 +181,11 @@ export async function runIngest(opts: IngestOptions = {}): Promise<IngestResult>
     .returning({ id: schema.events.id });
   const logCutoff = new Date(Date.now() - 2 * 86400_000).toISOString();
   await db.delete(schema.rawEvents).where(lt(schema.rawEvents.startsAt, logCutoff));
+  // 피드백 레이트리밋 기록도 24시간 경과분 정리 (윈도우는 1시간)
+  const feedbackCutoff = new Date(Date.now() - 86400_000).toISOString();
+  await db
+    .delete(schema.feedbackLog)
+    .where(lt(schema.feedbackLog.createdAt, feedbackCutoff));
 
   const total = await db.$count(schema.events);
   console.log(

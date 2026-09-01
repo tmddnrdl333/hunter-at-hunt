@@ -28,7 +28,7 @@ async function main() {
   // 적용 결과를 눈으로 검증할 수 있게 출력
   const status = await dbClient<{ relname: string; relrowsecurity: boolean }[]>`
     select relname, relrowsecurity from pg_class
-    where relnamespace = 'public'::regnamespace and relkind = 'r'
+    where relnamespace = 'public'::regnamespace and relkind in ('r', 'p')
     order by relname
   `;
   for (const r of status) {

@@ -1,6 +1,7 @@
 import {
   boolean,
   doublePrecision,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -67,12 +68,16 @@ export const likes = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.eventId] })],
 );
 
-/** 피드백 발송 기록 — 사용자별 레이트 리밋 용도 */
-export const feedbackLog = pgTable('feedback_log', {
-  id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
-  userId: uuid('user_id').notNull(),
-  createdAt: text('created_at').notNull(),
-});
+/** 피드백 발송 기록 — 사용자별 레이트 리밋 용도. 24시간 경과분은 ingest가 정리 */
+export const feedbackLog = pgTable(
+  'feedback_log',
+  {
+    id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+    userId: uuid('user_id').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [index('feedback_log_user_time').on(t.userId, t.createdAt)],
+);
 
 export const rawEvents = pgTable('raw_events', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
