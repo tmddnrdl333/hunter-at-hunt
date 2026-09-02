@@ -55,7 +55,10 @@ export const localist: SourceAdapter = {
             organizer: e.groups?.[0]?.name ?? null,
             perks: [],
             isFree: e.free,
-            category: 'campus',
+            // 다이닝/캠퍼스 상점 주최는 Dining 카테고리로 분류
+            category: /dining|campus enterprises/i.test(e.groups?.[0]?.name ?? '')
+              ? 'dining'
+              : 'campus',
             imageUrl: e.photo_url,
             sourceUrl: e.localist_url,
             raw: e,

@@ -9,9 +9,9 @@ export const PERK_VALUES = [
 
 export type Perk = (typeof PERK_VALUES)[number];
 
-export type SourceName = 'localist' | 'engage' | 'wordpress' | 'sidearm';
+export type SourceName = 'localist' | 'engage' | 'wordpress' | 'sidearm' | 'foodtrucks';
 
-export type Category = 'campus' | 'club' | 'academic' | 'sports';
+export type Category = 'campus' | 'club' | 'academic' | 'sports' | 'dining';
 
 /** 모든 소스 어댑터가 뱉는 공통 형식. DB events 테이블과 1:1 대응. */
 export interface NormalizedEvent {

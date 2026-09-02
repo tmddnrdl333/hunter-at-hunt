@@ -60,6 +60,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
   club: '🎪 Clubs',
   academic: '📚 Academic',
   sports: '🏈 Sports',
+  dining: '🍽️ Dining',
 };
 
 /** null = 전체 (선택 해제 상태가 곧 All) */

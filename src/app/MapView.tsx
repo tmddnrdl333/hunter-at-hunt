@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { CAMPUS_BOUNDARY } from '@/lib/campus-boundary';
 import type { Perk } from '@/lib/types';
 
 export interface MapEventItem {
@@ -15,8 +16,9 @@ export interface MapEventItem {
   lng: number;
 }
 
-/** NC State 메인 캠퍼스 (벨타워 인근) */
-const CAMPUS_CENTER: L.LatLngExpression = [35.7847, -78.6821];
+/** 초기 뷰: 메인 캠퍼스 핵심부 (+ Centennial 북단) */
+const INITIAL_CENTER: L.LatLngExpression = [35.7822, -78.6785];
+const INITIAL_ZOOM = 15;
 
 function escapeHtml(s: string): string {
   return s.replace(
@@ -36,11 +38,23 @@ export default function MapView({ events }: { events: MapEventItem[] }) {
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const map = L.map(containerRef.current).setView(CAMPUS_CENTER, 15);
+    const map = L.map(containerRef.current).setView(INITIAL_CENTER, INITIAL_ZOOM);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19,
     }).addTo(map);
+    // 캠퍼스 경계선 (OSM 폴리곤) — NC State 레드 점선
+    for (const ring of CAMPUS_BOUNDARY) {
+      L.polygon(ring, {
+        color: '#b80000',
+        weight: 2,
+        dashArray: '6 4',
+        fill: true,
+        fillColor: '#b80000',
+        fillOpacity: 0.04,
+        interactive: false,
+      }).addTo(map);
+    }
     layerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
     return () => {
@@ -55,7 +69,6 @@ export default function MapView({ events }: { events: MapEventItem[] }) {
     const map = mapRef.current;
     if (!layer || !map) return;
     layer.clearLayers();
-    const points: L.LatLngExpression[] = [];
     for (const e of events) {
       const emoji = e.perks.includes('free_food') ? '🍕' : e.perks.length > 0 ? '🎁' : '📍';
       const icon = L.divIcon({
@@ -77,20 +90,9 @@ export default function MapView({ events }: { events: MapEventItem[] }) {
           }<br><a href="/event/${e.id}">View event →</a>`,
         ),
       );
-      points.push([e.lat, e.lng]);
     }
-    // 초기 뷰포트는 캠퍼스 인근(±약 9km) 핀 기준으로만 — 원거리 이벤트가
-    // 있어도 주 단위로 줌아웃되지 않게 (원거리 핀은 직접 이동하면 보임)
-    const [cLat, cLng] = CAMPUS_CENTER as [number, number];
-    const near = points.filter(
-      (p) =>
-        Math.abs((p as [number, number])[0] - cLat) < 0.08 &&
-        Math.abs((p as [number, number])[1] - cLng) < 0.08,
-    );
-    const boundsSource = near.length > 0 ? near : points;
-    if (boundsSource.length > 0) {
-      map.fitBounds(L.latLngBounds(boundsSource).pad(0.15), { maxZoom: 16 });
-    }
+    // 뷰포트는 고정(캠퍼스 핵심부) — 필터가 바뀌어도 지도가 널뛰지 않는다.
+    // 화면 밖 핀은 사용자가 직접 이동/줌아웃하면 보임.
   }, [events]);
 
   return (
