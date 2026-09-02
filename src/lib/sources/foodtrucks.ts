@@ -17,14 +17,21 @@ export const foodtrucks: SourceAdapter = {
   name: 'foodtrucks',
   async fetchEvents({ days }) {
     const out: NormalizedEvent[] = [];
+    const seen = new Set<string>();
     for (let i = 0; i < days; i++) {
       const d = new Date(Date.now() + i * 86400_000);
       const dateKey = d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+      // DST 전환일에 24h 더하기가 같은 ET 날짜를 두 번 만들 수 있음 → 중복 방지
+      if (seen.has(dateKey)) continue;
+      seen.add(dateKey);
       const weekday = d.toLocaleDateString('en-US', {
         timeZone: 'America/New_York',
         weekday: 'short',
       });
       if (weekday === 'Sat' || weekday === 'Sun') continue;
+      const endsAt = easternToUtc(`${dateKey}T13:30:00`);
+      // 오늘치가 이미 끝난 시각이면 생성하지 않음 (넣자마자 purge되어 LLM만 낭비)
+      if (endsAt.getTime() <= Date.now()) continue;
       out.push({
         source: 'foodtrucks',
         sourceId: `vcc:${dateKey}`,
@@ -32,7 +39,7 @@ export const foodtrucks: SourceAdapter = {
         descriptionText:
           "A rotating lineup of local food trucks parks at the Venture Center Courtyard on Centennial Campus every weekday, 11:30 AM to 1:30 PM. Check today's lineup and menus on StreetFoodFinder.",
         startsAt: easternToUtc(`${dateKey}T11:30:00`).toISOString(),
-        endsAt: easternToUtc(`${dateKey}T13:30:00`).toISOString(),
+        endsAt: endsAt.toISOString(),
         locationName: 'Venture Center Courtyard, Centennial Campus',
         address: '1017 Main Campus Dr, Raleigh',
         lat: LAT,

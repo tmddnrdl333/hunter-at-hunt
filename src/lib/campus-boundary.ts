@@ -1,5 +1,5 @@
 /**
- * NC State 캠퍼스 경계 폴리곤 (OSM/Nominatim에서 추출, ~40포인트로 단순화).
+ * NC State 캠퍼스 경계 폴리곤 (OSM/Nominatim에서 추출, 총 159포인트로 단순화).
  * [lat, lng] 순서 — Leaflet 형식.
  */
 export const CAMPUS_BOUNDARY: [number, number][][] = [

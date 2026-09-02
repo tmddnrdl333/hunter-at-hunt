@@ -38,7 +38,12 @@ export default function MapView({ events }: { events: MapEventItem[] }) {
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-    const map = L.map(containerRef.current).setView(INITIAL_CENTER, INITIAL_ZOOM);
+    // scrollWheelZoom off: 커서가 지도 위에 있을 때 페이지 스크롤이 줌으로
+    // 먹히는 트래핑 방지 (줌은 버튼/더블클릭/핀치로)
+    const map = L.map(containerRef.current, { scrollWheelZoom: false }).setView(
+      INITIAL_CENTER,
+      INITIAL_ZOOM,
+    );
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
       maxZoom: 19,
@@ -88,6 +93,8 @@ export default function MapView({ events }: { events: MapEventItem[] }) {
           `<strong>${escapeHtml(e.title)}</strong><br>${time}${
             e.locationName ? ' · ' + escapeHtml(e.locationName) : ''
           }<br><a href="/event/${e.id}">View event →</a>`,
+          // 스티키 필터바(z-40) 아래에 팝업이 가리지 않게 위쪽 여백 확보
+          { autoPanPaddingTopLeft: L.point(10, 130) },
         ),
       );
     }
@@ -99,6 +106,8 @@ export default function MapView({ events }: { events: MapEventItem[] }) {
     // isolate: Leaflet 내부의 높은 z-index가 스티키 필터바 위로 새는 것 방지
     <div
       ref={containerRef}
+      role="region"
+      aria-label="Campus events map"
       className="relative isolate z-0 h-[65vh] w-full rounded-xl border border-stone-200 dark:border-stone-700"
     />
   );
