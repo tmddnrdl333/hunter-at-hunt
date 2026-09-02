@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
@@ -25,6 +26,20 @@ const PERK_LABELS: Record<Perk, string> = {
 };
 
 const MAX_INT4 = 2147483647;
+
+/** 프리페치/봇성 렌더를 거른 실제 조회만 view_count 증가 */
+async function countRealView(eventId: number) {
+  const h = await headers();
+  const isPrefetch =
+    h.has('next-router-prefetch') ||
+    h.get('purpose') === 'prefetch' ||
+    h.get('sec-purpose')?.includes('prefetch');
+  if (isPrefetch) return;
+  await db
+    .update(schema.events)
+    .set({ viewCount: sql`${schema.events.viewCount} + 1` })
+    .where(eq(schema.events.id, eventId));
+}
 
 // React cache: generateMetadata와 페이지 본문이 같은 요청에서 중복 조회하지 않게
 const getEvent = cache(async (idParam: string) => {
@@ -128,11 +143,9 @@ export default async function EventPage({
               ),
             )
         : Promise.resolve([]),
-      // 공유 링크 유입도 조회수에 집계 (카드 클릭과 동일 지표)
-      db
-        .update(schema.events)
-        .set({ viewCount: sql`${schema.events.viewCount} + 1` })
-        .where(eq(schema.events.id, event.id)),
+      // 조회수 집계 — 단, Next의 자동 프리페치 렌더는 사람이 본 게 아니므로 제외
+      // (홈 화면에 카드가 보이기만 해도 상세가 프리페치되어 수치가 뻥튀기됨)
+      countRealView(event.id),
     ]);
 
   const likeCountByComment = new Map(commentLikeRows.map((r) => [r.commentId, r.n]));
