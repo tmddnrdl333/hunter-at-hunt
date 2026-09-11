@@ -1,10 +1,19 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Category, Perk } from '@/lib/types';
 import { EventActionsMenu } from './EventActionsMenu';
 import { SignInModal } from './SignInModal';
+
+// 지도는 토글할 때만 코드/타일을 로드 — 리스트 사용자에겐 비용 0
+const MapView = dynamic(() => import('./MapView'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[65vh] w-full animate-pulse rounded-xl bg-stone-200 dark:bg-stone-800" />
+  ),
+});
 
 export interface EventItem {
   id: number;
@@ -23,6 +32,8 @@ export interface EventItem {
   viewCount: number;
   likeCount: number;
   trending: boolean;
+  lat: number | null;
+  lng: number | null;
 }
 
 /** UI 필터/뱃지는 4종으로 단순화 — swag/prize/free_stuff는 Goodies로 묶음 */
@@ -49,6 +60,7 @@ const CATEGORY_LABELS: Record<Category, string> = {
   club: '🎪 Clubs',
   academic: '📚 Academic',
   sports: '🏈 Sports',
+  dining: '🍽️ Dining',
 };
 
 /** null = 전체 (선택 해제 상태가 곧 All) */
@@ -129,6 +141,31 @@ export function EventList({
   const [catFilter, setCatFilter] = useState<Category | null>(null);
   const [query, setQuery] = useState('');
   const [likedOnly, setLikedOnly] = useState(false);
+  // 마지막으로 본 뷰 기억 — useSyncExternalStore로 effect 없이 복원
+  // (서버 스냅샷은 'list' → 하이드레이션 후 저장값으로 자연 전환)
+  const storedView = useSyncExternalStore(
+    () => () => {},
+    () => {
+      try {
+        return localStorage.getItem('hah_view');
+      } catch {
+        return null;
+      }
+    },
+    () => null,
+  );
+  const [viewOverride, setViewOverride] = useState<'list' | 'map' | null>(null);
+  const view: 'list' | 'map' = viewOverride ?? (storedView === 'map' ? 'map' : 'list');
+  const viewRef = useRef(view);
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+  const switchView = (v: 'list' | 'map') => {
+    setViewOverride(v);
+    try {
+      localStorage.setItem('hah_view', v);
+    } catch {}
+  };
   const [myLikes, setMyLikes] = useState<Set<number>>(() => new Set(initialLikes));
   /** 낙관적 카운트 보정: eventId → 누적 delta (서버 확정치 위에 항상 더해짐) */
   const [likeDelta, setLikeDelta] = useState<Map<number, number>>(new Map());
@@ -181,10 +218,31 @@ export function EventList({
     setVisibleCount(PAGE_SIZE);
   }, [query, perkFilter, whenFilter, catFilter, likedOnly, rangeFrom, rangeTo]);
 
-  // 무한 스크롤: 바닥 근처에 오면 다음 페이지 렌더
+  // 지도용 이벤트: useMemo로 참조 안정화 — 인라인 배열이면 매 리렌더마다
+  // 마커가 전멸·재생성되어 열려 있던 팝업이 닫힌다. NaN 좌표는 Leaflet이
+  // throw하므로 isFinite로 걸러냄.
+  const mapEvents = useMemo(
+    () =>
+      filtered
+        .filter((e) => Number.isFinite(e.lat) && Number.isFinite(e.lng))
+        .map((e) => ({
+          id: e.id,
+          title: e.title,
+          startsAt: e.startsAt,
+          locationName: e.locationName,
+          perks: e.perks,
+          lat: e.lat!,
+          lng: e.lng!,
+        })),
+    [filtered],
+  );
+  const unmappedCount = filtered.length - mapEvents.length;
+
+  // 무한 스크롤: 바닥 근처에 오면 다음 페이지 렌더 (지도 뷰에서는 비활성)
   totalRef.current = filtered.length;
   useEffect(() => {
     const onScroll = () => {
+      if (viewRef.current === 'map') return;
       const nearBottom =
         window.innerHeight + window.scrollY >=
         document.documentElement.scrollHeight - 600;
@@ -272,14 +330,42 @@ export function EventList({
     <div>
       {/* 스크롤해도 상단에 붙는 필터바 */}
       <div className="sticky top-0 z-40 -mx-4 mb-2 space-y-2 border-b border-stone-200 bg-background/90 px-4 py-2.5 backdrop-blur dark:border-stone-800">
-        <input
-          type="search"
-          aria-label="Search events"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="🔍 Search events, places, clubs…"
-          className="w-full rounded-lg border border-stone-300 bg-white/70 px-3 py-1.5 text-sm placeholder:text-stone-400 focus:border-red-700 focus:outline-none dark:border-stone-600 dark:bg-stone-800/70"
-        />
+        <div className="flex gap-2">
+          <input
+            type="search"
+            aria-label="Search events"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="🔍 Search events, places, clubs…"
+            className="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white/70 px-3 py-1.5 text-sm placeholder:text-stone-400 focus:border-red-700 focus:outline-none dark:border-stone-600 dark:bg-stone-800/70"
+          />
+          <div className="flex shrink-0 overflow-hidden rounded-lg border border-stone-300 text-sm dark:border-stone-600">
+            <button
+              type="button"
+              aria-pressed={view === 'list'}
+              onClick={() => switchView('list')}
+              className={
+                view === 'list'
+                  ? 'bg-red-800 px-3 py-1.5 font-medium text-white'
+                  : 'bg-white/70 px-3 py-1.5 text-stone-600 hover:text-red-800 dark:bg-stone-800/70 dark:text-stone-300'
+              }
+            >
+              List
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === 'map'}
+              onClick={() => switchView('map')}
+              className={
+                view === 'map'
+                  ? 'bg-red-800 px-3 py-1.5 font-medium text-white'
+                  : 'bg-white/70 px-3 py-1.5 text-stone-600 hover:text-red-800 dark:bg-stone-800/70 dark:text-stone-300'
+              }
+            >
+              🗺️ Map
+            </button>
+          </div>
+        </div>
         <FilterRow label="Freebies">
           {(Object.keys(PERK_GROUP_LABELS) as PerkGroup[]).map((p) => (
             <button
@@ -363,6 +449,19 @@ export function EventList({
         message="Sign in to save events you don't want to miss."
       />
 
+      {view === 'map' && filtered.length > 0 && (
+        <>
+          <MapView events={mapEvents} />
+          {unmappedCount > 0 && (
+            <p className="mt-2 text-center text-xs text-stone-400">
+              {unmappedCount} event{unmappedCount > 1 ? 's' : ''} without location data{' '}
+              {unmappedCount > 1 ? "aren't" : "isn't"} shown on the map — check the list
+              view.
+            </p>
+          )}
+        </>
+      )}
+
       {filtered.length === 0 && (
         <div className="py-12 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -379,6 +478,8 @@ export function EventList({
         </div>
       )}
 
+      {/* 지도 뷰에서는 리스트를 아예 렌더하지 않음 (숨김 DOM이 계속 자라는 것 방지) */}
+      {view === 'list' && (
       <ul>
         {visible.map((e) => {
           const day = dayKey(e.startsAt);
@@ -479,10 +580,11 @@ export function EventList({
           );
         })}
       </ul>
-      {visible.length < filtered.length && (
+      )}
+      {view === 'list' && visible.length < filtered.length && (
         <p className="py-4 text-center text-xs text-stone-400">Loading more…</p>
       )}
-      {filtered.length > 0 && visible.length >= filtered.length && (
+      {view === 'list' && filtered.length > 0 && visible.length >= filtered.length && (
         <div className="py-10 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

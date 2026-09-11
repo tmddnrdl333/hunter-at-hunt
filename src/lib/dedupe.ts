@@ -7,6 +7,7 @@ const SOURCE_PRIORITY: Record<SourceName, number> = {
   engage: 1,
   wordpress: 2,
   sidearm: 3,
+  foodtrucks: 4,
 };
 
 const SIMILARITY_THRESHOLD = 0.75;

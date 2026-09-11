@@ -26,6 +26,12 @@ export function easternToUtc(naive: string): Date {
   return new Date(guess.getTime() - nyOffsetMs);
 }
 
+/** 소스가 준 좌표 문자열/값을 검증된 number 또는 null로 — NaN이 DB에 들어가면 지도가 crash */
+export function toCoord(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function toIso(d: Date | string): string {
   return (typeof d === 'string' ? new Date(d) : d).toISOString();
 }

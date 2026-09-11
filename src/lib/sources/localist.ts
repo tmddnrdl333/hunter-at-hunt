@@ -1,5 +1,5 @@
 import type { NormalizedEvent, SourceAdapter } from '../types';
-import { fetchJson, htmlToText, toIso } from '../util';
+import { fetchJson, htmlToText, toCoord, toIso } from '../util';
 
 const BASE = 'https://calendar.ncsu.edu/api/2/events';
 
@@ -50,12 +50,15 @@ export const localist: SourceAdapter = {
             address: e.geo?.street
               ? `${e.geo.street}${e.geo.city ? ', ' + e.geo.city : ''}`
               : e.address || null,
-            lat: e.geo?.latitude ? Number(e.geo.latitude) : null,
-            lng: e.geo?.longitude ? Number(e.geo.longitude) : null,
+            lat: toCoord(e.geo?.latitude),
+            lng: toCoord(e.geo?.longitude),
             organizer: e.groups?.[0]?.name ?? null,
             perks: [],
             isFree: e.free,
-            category: 'campus',
+            // 다이닝/캠퍼스 상점 주최는 Dining 카테고리로 분류
+            category: /dining|campus enterprises/i.test(e.groups?.[0]?.name ?? '')
+              ? 'dining'
+              : 'campus',
             imageUrl: e.photo_url,
             sourceUrl: e.localist_url,
             raw: e,

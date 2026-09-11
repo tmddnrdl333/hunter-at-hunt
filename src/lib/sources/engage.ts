@@ -1,6 +1,6 @@
 import type { NormalizedEvent, SourceAdapter } from '../types';
 import { mapEngageBenefits } from '../perks';
-import { fetchJson, htmlToText, toIso } from '../util';
+import { fetchJson, htmlToText, toCoord, toIso } from '../util';
 
 const BASE = 'https://getinvolved.ncsu.edu/api/discovery/event/search';
 const IMAGE_CDN = 'https://se-images.campuslabs.com/clink/images/';
@@ -50,8 +50,8 @@ export const engage: SourceAdapter = {
           endsAt: e.endsOn ? toIso(e.endsOn) : null,
           locationName: e.location || null,
           address: null,
-          lat: e.latitude ? Number(e.latitude) : null,
-          lng: e.longitude ? Number(e.longitude) : null,
+          lat: toCoord(e.latitude),
+          lng: toCoord(e.longitude),
           organizer: e.organizationName,
           perks: mapEngageBenefits(e.benefitNames ?? []),
           isFree: (e.benefitNames ?? []).length > 0,

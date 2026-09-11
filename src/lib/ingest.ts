@@ -105,10 +105,23 @@ export async function runIngest(opts: IngestOptions = {}): Promise<IngestResult>
   }
   console.log(`변경 없음 ${unchanged}건 / 정제 대상 ${toEnrich.length}건`);
 
-  // 4. LLM 정제 (배치) — 실패 시 키워드 폴백
+  // 4. LLM 정제 (배치) — 실패 시 키워드 폴백.
+  //    합성 소스(foodtrucks)는 내용이 고정이라 LLM을 태우지 않는다
+  //    (비용 절약 + 유료 푸드트럭에 free_food가 오태깅될 여지 차단)
   const enriched = new Map<Pending, { summary: string | null; perks: Perk[] }>();
-  for (let i = 0; i < toEnrich.length; i += LLM_BATCH_SIZE) {
-    const batch = toEnrich.slice(i, i + LLM_BATCH_SIZE);
+  const llmTargets = toEnrich.filter((p) => {
+    if (p.event.source === 'foodtrucks') {
+      enriched.set(p, {
+        summary:
+          "Rotating local food trucks park here every weekday over lunch — check today's lineup on StreetFoodFinder.",
+        perks: [],
+      });
+      return false;
+    }
+    return true;
+  });
+  for (let i = 0; i < llmTargets.length; i += LLM_BATCH_SIZE) {
+    const batch = llmTargets.slice(i, i + LLM_BATCH_SIZE);
     let results = null;
     if (useLlm) {
       results = await enrichWithLlm(
@@ -118,7 +131,7 @@ export async function runIngest(opts: IngestOptions = {}): Promise<IngestResult>
         })),
       );
       console.log(
-        `  LLM 배치 ${Math.floor(i / LLM_BATCH_SIZE) + 1}/${Math.ceil(toEnrich.length / LLM_BATCH_SIZE)} ${results ? 'ok' : 'fallback'}`,
+        `  LLM 배치 ${Math.floor(i / LLM_BATCH_SIZE) + 1}/${Math.ceil(llmTargets.length / LLM_BATCH_SIZE)} ${results ? 'ok' : 'fallback'}`,
       );
     }
     batch.forEach((p, j) => {

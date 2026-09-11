@@ -87,6 +87,8 @@ export default async function Home({
     viewCount: r.viewCount,
     likeCount: likeCountMap.get(r.id) ?? 0,
     trending: trendingIds.has(r.id),
+    lat: r.lat,
+    lng: r.lng,
   }));
 
   // 오늘의 하이라이트: perks 태그 집계 (LLM 추가 호출 없음 — ingest 때 붙인 태그를 세기만 함)
